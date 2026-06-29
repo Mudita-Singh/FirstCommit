@@ -1,0 +1,111 @@
+/**
+ * GitHub API Service
+ * Handles all direct communication with the GitHub REST API.
+ */
+
+/**
+ * Fetches the recursive repository tree from GitHub.
+ * Attempts branch 'main' first, and falls back to 'master' if main is not found.
+ * 
+ * @param {string} owner - Repository owner (username or organization).
+ * @param {string} repo - Repository name.
+ * @returns {Promise<Array>} List of file objects in the repository tree.
+ */
+async function fetchRepoStructure(owner, repo) {
+  const token = process.env.GITHUB_TOKEN;
+  
+  // Set up standard headers required by GitHub
+  // IMPORTANT: GitHub requires a User-Agent header. Without it, the API throws a 403 Forbidden.
+  const headers = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'FirstCommit-Dev-Application'
+  };
+
+  // Add the Personal Access Token if it is configured in the server's .env file
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
+  }
+
+  // Attempt to fetch from 'main' first, and fallback to 'master' if it fails
+  const branchesToTry = ['main', 'master'];
+  let lastError = null;
+
+  for (const branch of branchesToTry) {
+    try {
+      const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+      const response = await fetch(url, { headers });
+
+      if (response.status === 404) {
+        // If 404, it might mean the branch doesn't exist, we will try the next branch
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`GitHub API returned status ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Git Tree response contains a 'tree' array of files and folders
+      if (data && Array.isArray(data.tree)) {
+        return data.tree;
+      }
+      
+      throw new Error('Invalid response structure received from GitHub.');
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  // If we reach here, both branches failed or threw an error
+  throw lastError || new Error(`Repository not found or branch structure not supported.`);
+}
+
+/**
+ * Fetches repository metadata (stars count and primary programming language).
+ * Returns default values on failure to prevent crashing the main analysis path.
+ * 
+ * @param {string} owner - Repository owner.
+ * @param {string} repo - Repository name.
+ * @returns {Promise<object>} Metadata object { stars, language }.
+ */
+async function fetchRepoMetadata(owner, repo) {
+  const token = process.env.GITHUB_TOKEN;
+  
+  const headers = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'FirstCommit-Dev-Application'
+  };
+
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
+  }
+
+  try {
+    const url = `https://api.github.com/repos/${owner}/${repo}`;
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+      throw new Error(`GitHub metadata returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      stars: data.stargazers_count || 0,
+      language: data.language || 'JavaScript' // fallback default
+    };
+  } catch (error) {
+    console.error(`⚠️ Failed to fetch metadata for ${owner}/${repo}:`, error.message);
+    // Return graceful fallback so the main analysis flow doesn't fail
+    return {
+      stars: 0,
+      language: 'Unknown'
+    };
+  }
+}
+
+module.exports = {
+  fetchRepoStructure,
+  fetchRepoMetadata
+};
+
