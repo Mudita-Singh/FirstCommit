@@ -105,17 +105,6 @@ Tracks questions asked, common mistakes, and future improvements.
 2. **How does standard CSS handle monospace ASCII borders (like `----------------------`) dynamically without breaking screen wrap boundaries?**
    - *Answer*: By using `user-select: none` to prevent copy errors, set a solid monospace typography `font-family: var(--mono)`, and ensure borders wrap or hide correctly. We can also style elements as simple text borders to scale with the wrapper container elements.
 
----
-
-## Milestone 11: Stripe-Inspired Premium Home & Cursor-Dark Workspace
-
-### Mentee Concept Check Questions & Answers
-1. **Why do we separate our application into two distinct themes (light onboarding home page vs. dark developer coding workspace) instead of choosing one single theme?**
-   - *Answer*: Onboarding pages should be bright, calm, and minimal to feel welcoming and professional to first-time users. In contrast, code editors and file comparison workspaces benefit from a high-performance dark theme because it reduces eye strain and helps developers focus on syntax structures. 
-2. **What are the rendering advantages of using a CSS `radial-gradient` pattern for dot-grids instead of loading a PNG image file?**
-   - *Answer*: A PNG file requires a separate network request and occupies bandwidth. A CSS gradient is defined in text (less than 80 bytes) and is computed dynamically on the user's GPU layer, which guarantees near-instant page load times and remains perfectly sharp at any display resolution.
-
-
 
 
 

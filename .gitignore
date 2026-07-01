@@ -5,3 +5,9 @@ node_modules/
 dist/
 .gemini/
 .agents/
+
+ARCHITECTURE.md
+COMMANDS.md
+LEARNING_NOTES.md
+PROJECT_LOG.md
+QUESTIONS.md

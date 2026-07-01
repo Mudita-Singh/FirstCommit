@@ -104,8 +104,40 @@ async function fetchRepoMetadata(owner, repo) {
   }
 }
 
+/**
+ * Fetches raw file content from GitHub repository.
+ * Uses repository contents API with the vnd.github.v3.raw media type.
+ * 
+ * @param {string} owner - Repository owner.
+ * @param {string} repo - Repository name.
+ * @param {string} filePath - Path to the file.
+ * @returns {Promise<string>} Raw code content.
+ */
+async function fetchFileContent(owner, repo, filePath) {
+  const token = process.env.GITHUB_TOKEN;
+  
+  const headers = {
+    'Accept': 'application/vnd.github.v3.raw',
+    'User-Agent': 'FirstCommit-Dev-Application'
+  };
+
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
+  }
+
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
+  const response = await fetch(url, { headers });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API returned status ${response.status} when fetching file content: ${response.statusText}`);
+  }
+
+  return await response.text();
+}
+
 module.exports = {
   fetchRepoStructure,
-  fetchRepoMetadata
+  fetchRepoMetadata,
+  fetchFileContent
 };
 

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchHealth, analyzeRepository, fetchFileExplanation } from './services/api';
+import { fetchHealth, analyzeRepository, fetchFileExplanation, fetchRawFileContent } from './services/api';
+import CodeViewer from './CodeViewer';
+import Navbar from './Navbar';
 import './App.css';
 
 // ─── single source of truth for repo analysis ────────────────────────────────
@@ -16,17 +18,32 @@ function App() {
   const [fileCode, setFileCode] = useState('');
   const [fileExplanation, setFileExplanation] = useState('');
   const [isViewerLoading, setIsViewerLoading] = useState(false);
+  const [techStack, setTechStack] = useState([]);
+  const [repoDescription, setRepoDescription] = useState('');
+
+  // Ref to track latest analysisData in popstate closure
+  const analysisDataRef = useRef(analysisData);
+  useEffect(() => {
+    analysisDataRef.current = analysisData;
+  }, [analysisData]);
 
   // Sync-scroll refs
   const codeRef = useRef(null);
   const explainRef = useRef(null);
   const activeScrollRef = useRef(null);
 
-  // ── Browser history: push when entering workspace, pop to go home ──────────
+  // ── Browser history: handle home nav and CodeViewer back operations ────────
   useEffect(() => {
     const handlePop = (e) => {
-      // User pressed Back — return to homepage
-      if (window.location.pathname === '/' || !e.state?.view) {
+      if (e.state?.view === 'workspace') {
+        if (e.state.file) {
+          const fileObj = analysisDataRef.current?.files?.find(f => f.path === e.state.file);
+          if (fileObj) setSelectedFile(fileObj);
+        } else {
+          setSelectedFile(null);
+        }
+      } else {
+        // User pressed Back — return to homepage
         setAnalysisData(null);
         setSelectedFile(null);
         setFileCode('');
@@ -93,38 +110,118 @@ function App() {
     setError(null);
   };
 
+  // Scroll to top when analysis completes and the Read Order list mounts
+  useEffect(() => {
+    if (analysisData) {
+      window.scrollTo(0, 0);
+    }
+  }, [analysisData]);
+
+  // Fetch repo description dynamically from GitHub public API
+  useEffect(() => {
+    if (!analysisData) {
+      setRepoDescription('');
+      return;
+    }
+    const fetchDescription = async () => {
+      try {
+        const response = await fetch(`https://api.github.com/repos/${analysisData.owner}/${analysisData.repo}`);
+        if (response.ok) {
+          const data = await response.json();
+          setRepoDescription(data.description || '');
+        }
+      } catch (err) {
+        console.error('Failed to fetch repo description from GitHub API:', err);
+      }
+    };
+    fetchDescription();
+  }, [analysisData]);
+
+  // Asynchronously load and parse package.json for tech stack tags
+  useEffect(() => {
+    if (!analysisData) {
+      setTechStack([]);
+      return;
+    }
+
+    const loadTechStack = async () => {
+      const list = [];
+      
+      const hasPackageJson = analysisData.files?.some(f => f.path === 'package.json');
+      if (hasPackageJson) {
+        try {
+          const res = await fetchRawFileContent(analysisData.owner, analysisData.repo, 'package.json');
+          if (res?.status === 'success' && res.data?.rawContent) {
+            const pkg = JSON.parse(res.data.rawContent);
+            const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+            
+            const mapping = {
+              'express': 'Express',
+              'react': 'React',
+              'react-dom': 'React DOM',
+              'typescript': 'TypeScript',
+              'mongoose': 'MongoDB',
+              'mongodb': 'MongoDB',
+              'jest': 'Jest',
+              'mocha': 'Mocha',
+              'webpack': 'Webpack',
+              'vite': 'Vite',
+              'tailwindcss': 'Tailwind CSS',
+              'next': 'Next.js',
+              'vue': 'Vue',
+              'nuxt': 'Nuxt',
+              'angular': 'Angular',
+              'redux': 'Redux',
+              'axios': 'Axios',
+              'prisma': 'Prisma',
+              'graphql': 'GraphQL',
+              'apollo-client': 'Apollo',
+              'eslint': 'ESLint',
+              'prettier': 'Prettier',
+              'nodemon': 'Nodemon',
+              'dotenv': 'Dotenv'
+            };
+
+            Object.keys(deps).forEach(dep => {
+              if (mapping[dep]) {
+                list.push(mapping[dep]);
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Failed to parse tech stack:', e);
+        }
+      }
+
+      // Filter out primary language already shown in metadata row
+      const lang = analysisData.language ? analysisData.language.trim().toLowerCase() : '';
+      const filteredList = list.filter(item => item.trim().toLowerCase() !== lang);
+      const uniqueList = Array.from(new Set(filteredList)).slice(0, 8);
+      
+      if (uniqueList.length < 2) {
+        setTechStack([]);
+      } else {
+        setTechStack(uniqueList);
+      }
+    };
+
+    loadTechStack();
+  }, [analysisData]);
+
   // ── File viewer ────────────────────────────────────────────────────────────
-  const handleReadFile = async (path) => {
+  const handleReadFile = (path) => {
     if (!analysisData) return;
     const fileObj = analysisData.files.find(f => f.path === path);
     if (!fileObj) { setError(`Could not locate: ${path}`); return; }
-
-    setIsViewerLoading(true);
-    setError(null);
-    try {
-      const codeRes = await fetch(fileObj.url);
-      if (!codeRes.ok) throw new Error('Failed to fetch raw code from GitHub CDN.');
-      const codeText = await codeRes.text();
-
-      const explainRes = await fetchFileExplanation(path, codeText);
-      if (explainRes?.status === 'success') {
-        setFileCode(codeText);
-        setFileExplanation(explainRes.data.explanation);
-        setSelectedFile(fileObj);
-      } else {
-        throw new Error(explainRes?.message || 'Failed to fetch explanation');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsViewerLoading(false);
-    }
+    setSelectedFile(fileObj);
+    window.history.pushState({ view: 'workspace', file: path }, '', `/workspace?file=${encodeURIComponent(path)}`);
   };
 
   const handleBackToDashboard = () => {
     setSelectedFile(null);
-    setFileCode('');
-    setFileExplanation('');
+    if (window.history.state?.file) {
+      window.history.back();
+    }
   };
 
   const handleScrollSync = (source) => {
@@ -136,6 +233,80 @@ function App() {
     }
   };
 
+  const getFileIconLayout = (filePath) => {
+    const ext = filePath.split('.').pop().toLowerCase();
+    let bg = '#6B7280';
+    let text = ext.toUpperCase();
+    let fontSize = '0.7rem';
+    let fontWeight = '700';
+    
+    if (ext === 'md') {
+      bg = '#6366F1';
+      text = 'MD';
+      fontSize = '0.65rem';
+    } else if (ext === 'json') {
+      bg = '#10B981';
+      text = '{}';
+      fontSize = '0.9rem';
+      fontWeight = 'normal';
+    } else if (ext === 'js' || filePath.endsWith('.jsx')) {
+      bg = '#F59E0B';
+      text = 'JS';
+    } else if (ext === 'ts' || filePath.endsWith('.tsx')) {
+      bg = '#3B82F6';
+      text = 'TS';
+    } else if (ext === 'css') {
+      bg = '#8B5CF6';
+      text = 'CSS';
+    }
+    
+    return (
+      <div className="ws-file-icon-box" style={{ backgroundColor: bg }}>
+        <span className="ws-file-mono-text" style={{ fontSize, fontWeight }}>
+          {text}
+        </span>
+      </div>
+    );
+  };
+
+  const getCategoryTag = (filePath) => {
+    const lower = filePath.toLowerCase();
+    if (lower.includes('examples/')) {
+      if (lower.endsWith('.js') || lower.endsWith('.jsx') || lower.endsWith('.ts') || lower.endsWith('.tsx')) {
+        return { text: 'Example Code', bg: '#FDF2F8', color: '#9D174D' };
+      }
+      return { text: 'Examples', bg: '#FFF7ED', color: '#92400E' };
+    }
+    if (lower.endsWith('.md') && lower.includes('readme')) {
+      return { text: 'Documentation', bg: '#EEF2FF', color: '#4338CA' };
+    }
+    if (lower.endsWith('.json')) {
+      return { text: 'Configuration', bg: '#ECFDF5', color: '#065F46' };
+    }
+    if (lower.endsWith('history.md')) {
+      return { text: 'Documentation', bg: '#EEF2FF', color: '#4338CA' };
+    }
+    if (lower.includes('lib/') || lower.includes('src/')) {
+      return { text: 'Source', bg: '#F0F9FF', color: '#0369A1' };
+    }
+    return { text: 'Source', bg: '#F3F4F6', color: '#374151' };
+  };
+
+  const getDifficulty = (filePath) => {
+    const lower = filePath.toLowerCase();
+    if (lower.endsWith('.md') || lower.endsWith('package.json') || lower.includes('config') || lower.includes('setup') || lower.includes('init')) {
+      return 'Beginner';
+    }
+    const ext = lower.split('.').pop();
+    if (['json', 'yaml', 'yml', 'toml', 'ini', 'md', 'txt'].includes(ext)) {
+      return 'Beginner';
+    }
+    if (lower.includes('utils') || lower.includes('helper') || lower.includes('middleware') || lower.includes('auth') || lower.includes('parser') || lower.includes('engine') || lower.includes('router')) {
+      return 'Advanced';
+    }
+    return 'Intermediate';
+  };
+
   const formatStars = (n) => {
     if (!n) return '0';
     return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
@@ -143,6 +314,9 @@ function App() {
 
   const parseMarkdown = (md) => {
     if (!md) return '';
+    if (typeof md === 'object') {
+      return `<pre style="white-space: pre-wrap; font-family: monospace;"><code>${JSON.stringify(md, null, 2)}</code></pre>`;
+    }
     let inList = false;
     let html = '';
     md.split('\n').forEach(line => {
@@ -166,6 +340,7 @@ function App() {
     return html;
   };
 
+
   const isHome = !analysisData && !selectedFile;
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -177,16 +352,7 @@ function App() {
       {/* ── HOMEPAGE ─────────────────────────────────────────────────────── */}
       {isHome && (
         <>
-          {/* Minimal header — logo only */}
-          <header className="site-header">
-            <div className="header-logo">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              <span>FirstCommit</span>
-            </div>
-          </header>
+          <Navbar isHome={true} />
 
           <main className="home-main">
 
@@ -221,7 +387,7 @@ function App() {
                   className="search-btn"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Analyzing…' : 'Analyze →'}
+                  Analyze →
                 </button>
               </div>
             </form>
@@ -244,8 +410,8 @@ function App() {
             {/* Loading */}
             {isLoading && (
               <div className="hero-loading">
-                <div className="spinner"></div>
-                <p>Analyzing repository…</p>
+                <div className="spin-logo" style={{ fontSize: '48px', marginBottom: '1rem' }}>&lt;&gt;</div>
+                <p style={{ color: '#94A3B8' }}>Analyzing repository…</p>
               </div>
             )}
 
@@ -400,102 +566,119 @@ function App() {
       {/* ── WORKSPACE ────────────────────────────────────────────────────── */}
       {!isHome && (
         <div className="workspace-wrap">
-          {/* Workspace Nav */}
-          <nav className="workspace-nav">
-            <button className="workspace-logo-btn" onClick={handleGoHome}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              FirstCommit
-            </button>
-          </nav>
+          <Navbar isHome={false} onLogoClick={handleGoHome} />
 
-          {!selectedFile ? (
-            /* ── Read Order Dashboard ───────────────────────── */
-            <div className="workspace-dashboard">
-              <div className="ws-header">
-                <div>
-                  <h2 className="ws-repo-name">{analysisData?.owner}/{analysisData?.repo}</h2>
+          <div className="workspace-dashboard" style={{ display: selectedFile ? 'none' : 'block' }}>
+            {/* Repo Header Card */}
+            <div className="ws-header-card">
+              <div className="ws-header-left">
+                <div className="ws-repo-avatar">
+                  {analysisData?.repo ? analysisData.repo.slice(0, 2).toLowerCase() : 'fc'}
+                </div>
+                <div className="ws-repo-info">
+                  <h2 className="ws-repo-name">
+                    <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" className="ws-repo-link">
+                      {analysisData?.owner}/{analysisData?.repo}
+                      <span className="ws-external-icon">↗</span>
+                    </a>
+                  </h2>
+                  <p className="ws-repo-desc">{repoDescription || 'Fast, unopinionated, minimalist web framework for Node.js'}</p>
                   <div className="ws-badges">
-                    {analysisData?.stars && <span className="ws-badge">{formatStars(analysisData.stars)} ★</span>}
+                    {analysisData?.stars && <span className="ws-badge">★ {formatStars(analysisData.stars)}</span>}
                     {analysisData?.language && <span className="ws-badge">{analysisData.language}</span>}
                     {analysisData?.filesCount && <span className="ws-badge">{analysisData.filesCount} files</span>}
                   </div>
                 </div>
-                <button className="ws-rescan" onClick={handleRescan} disabled={isLoading}>
-                  [ Re-scan ]
+              </div>
+              <div className="ws-header-right">
+                <button className="ws-rescan-btn" onClick={handleRescan} disabled={isLoading}>
+                  ↺ Re-scan
                 </button>
-              </div>
-
-              <div className="ws-tabs">
-                <span className="ws-tab active">[Read Order]</span>
-              </div>
-
-              {error && <div className="ws-error">[ ERROR ] {error}</div>}
-
-              {(isLoading || isViewerLoading) && (
-                <div className="ws-loading">
-                  <div className="ws-spinner"></div>
-                  <p>{isViewerLoading ? 'Loading file…' : 'Scanning repository…'}</p>
-                </div>
-              )}
-
-              {!isLoading && !isViewerLoading && analysisData?.readingList && (
-                <div className="ws-list">
-                  {analysisData.readingList.map((file, i) => (
-                    <div key={file.path} className="ws-item">
-                      <div className="ws-item-header">
-                        <span className="ws-num">{i + 1}.</span>
-                        <span className="ws-path">{file.path}</span>
-                      </div>
-                      <div className="ws-item-body">
-                        <p>→ {file.explanation}</p>
-                        <p>→ {file.reason}</p>
-                        <button className="ws-read-btn" onClick={() => handleReadFile(file.path)}>
-                          [ Read Code &amp; Explanation ]
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ── Split View ─────────────────────────────────── */
-            <div className="split-view">
-              <nav className="split-nav">
-                <button className="back-btn" onClick={handleBackToDashboard}>[ ← Back ]</button>
-                <span className="split-title">📁 {selectedFile.path}</span>
-                <span className="split-repo">({analysisData?.owner}/{analysisData?.repo})</span>
-              </nav>
-
-              {error && <div className="ws-error">[ ERROR ] {error}</div>}
-
-              <div className="split-panels">
-                <div className="split-panel">
-                  <div className="panel-head">Source Code</div>
-                  <pre
-                    className="panel-code"
-                    ref={codeRef}
-                    onScroll={() => handleScrollSync('code')}
-                    onMouseEnter={() => { activeScrollRef.current = 'code'; }}
-                  >
-                    <code>{fileCode || '// Empty file'}</code>
-                  </pre>
-                </div>
-                <div className="split-panel">
-                  <div className="panel-head">AI Explanation</div>
-                  <div
-                    className="panel-explain"
-                    ref={explainRef}
-                    onScroll={() => handleScrollSync('explain')}
-                    onMouseEnter={() => { activeScrollRef.current = 'explain'; }}
-                    dangerouslySetInnerHTML={{ __html: parseMarkdown(fileExplanation) }}
-                  />
+                <div className="ws-illustrations">
+                  <svg width="140" height="90" viewBox="0 0 140 90" fill="none" style={{ opacity: 0.9 }}>
+                    <rect x="5" y="20" width="95" height="60" rx="6" fill="none" stroke="#E5E7EB" strokeWidth="1.5" strokeDasharray="3 3" />
+                    <rect x="50" y="8" width="85" height="65" rx="8" fill="#FFFFFF" stroke="#E5E7EB" strokeWidth="1.5" />
+                    <path d="M50 16C50 11.5817 53.5817 8 58 8H127C131.418 8 135 11.5817 135 16V22H50V16Z" fill="#1E293B" />
+                    <circle cx="58" cy="14" r="2" fill="#EF4444" />
+                    <circle cx="64" cy="14" r="2" fill="#F59E0B" />
+                    <circle cx="70" cy="14" r="2" fill="#10B981" />
+                    <text x="92" y="45" fill="#3B82F6" fontFamily="monospace" fontSize="20" fontWeight="700" textAnchor="middle">&lt;/&gt;</text>
+                    <rect x="65" y="54" width="40" height="2.5" rx="1" fill="#E2E8F0" />
+                    <rect x="65" y="60" width="55" height="2.5" rx="1" fill="#E2E8F0" />
+                  </svg>
                 </div>
               </div>
             </div>
+
+            {/* Read Order Heading Row */}
+            <div className="ws-tabs-new">
+              <div>
+                <h3 className="ws-tabs-title"><span style={{ marginRight: '0.4rem' }}>📋</span>Read Order</h3>
+                <p className="ws-tabs-subtitle">A recommended sequence to understand this repository step by step.</p>
+              </div>
+              <span className="ws-count-badge">{analysisData.readingList.length} items</span>
+            </div>
+
+            {error && <div className="ws-error">[ ERROR ] {error}</div>}
+
+            {(isLoading || isViewerLoading) && (
+              <div className="ws-loading">
+                <div className="spin-logo" style={{ fontSize: '48px', marginBottom: '1rem' }}>&lt;&gt;</div>
+                <p style={{ color: '#6B7280' }}>{isViewerLoading ? 'Loading file…' : 'Scanning repository…'}</p>
+              </div>
+            )}
+
+            {!isLoading && !isViewerLoading && analysisData?.readingList && (
+              <div className="ws-timeline-container">
+                <div className="ws-timeline-line"></div>
+                <div className="ws-list-timeline">
+                  {analysisData.readingList.map((file, i) => {
+                    const cat = getCategoryTag(file.path);
+                    return (
+                      <div key={file.path} className="ws-timeline-item">
+                        <div className="ws-timeline-badge">{i + 1}</div>
+                        <div className="ws-item-timeline-card">
+                          {getFileIconLayout(file.path)}
+                          <div className="ws-item-info">
+                            <div className="ws-item-header-row">
+                              <span className="ws-path">{file.path}</span>
+                              <span className="ws-category-pill" style={{ backgroundColor: cat.bg, color: cat.color }}>
+                                {cat.text}
+                              </span>
+                            </div>
+                            <div className="ws-item-body">
+                              <p className="ws-item-explanation">→ {file.explanation}</p>
+                              <p className="ws-item-reason">→ {file.reason}</p>
+                            </div>
+                          </div>
+                          <button className="ws-timeline-btn" onClick={() => handleReadFile(file.path)}>
+                            Read Code &amp; Explanation
+                            <span className="ws-chevron">›</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Tip Card */}
+                <div className="ws-tip-card">
+                  <div className="ws-tip-icon-circle">!</div>
+                  <div className="ws-tip-content">
+                    <h4 className="ws-tip-title">Tip</h4>
+                    <p className="ws-tip-text">Follow this order for the best learning experience. Each file builds context for the next one.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          {selectedFile && (
+            <CodeViewer
+              repoOwner={analysisData.owner}
+              repoName={analysisData.repo}
+              filePath={selectedFile.path}
+              onClose={handleBackToDashboard}
+            />
           )}
         </div>
       )}
