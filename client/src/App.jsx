@@ -235,38 +235,155 @@ function App() {
 
   const getFileIconLayout = (filePath) => {
     const ext = filePath.split('.').pop().toLowerCase();
-    let bg = '#6B7280';
-    let text = ext.toUpperCase();
-    let fontSize = '0.7rem';
-    let fontWeight = '700';
-    
+
+    // Each type: { bg, iconColor, label, svgPath }
+    let bg = '#F3F4F6';
+    let iconColor = '#6B7280';
+    let label = ext.toUpperCase();
+    let iconSvg = null;
+
     if (ext === 'md') {
-      bg = '#6366F1';
-      text = 'MD';
-      fontSize = '0.65rem';
+      bg = '#EFF6FF';
+      iconColor = '#3B82F6';
+      label = 'MD';
+      // Document icon
+      iconSvg = (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+      );
     } else if (ext === 'json') {
-      bg = '#10B981';
-      text = '{}';
-      fontSize = '0.9rem';
-      fontWeight = 'normal';
+      bg = '#ECFDF5';
+      iconColor = '#10B981';
+      label = 'JSON';
+      // Braces icon
+      iconSvg = (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      );
     } else if (ext === 'js' || filePath.endsWith('.jsx')) {
-      bg = '#F59E0B';
-      text = 'JS';
+      bg = '#FFFBEB';
+      iconColor = '#F59E0B';
+      label = 'JS';
+      // Code icon
+      iconSvg = (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      );
     } else if (ext === 'ts' || filePath.endsWith('.tsx')) {
-      bg = '#3B82F6';
-      text = 'TS';
+      bg = '#EFF6FF';
+      iconColor = '#3B82F6';
+      label = 'TS';
+      iconSvg = (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      );
     } else if (ext === 'css') {
-      bg = '#8B5CF6';
-      text = 'CSS';
+      bg = '#F5F3FF';
+      iconColor = '#7C3AED';
+      label = 'CSS';
+      iconSvg = (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      );
+    } else {
+      iconSvg = (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      );
     }
-    
+
     return (
       <div className="ws-file-icon-box" style={{ backgroundColor: bg }}>
-        <span className="ws-file-mono-text" style={{ fontSize, fontWeight }}>
-          {text}
-        </span>
+        <div className="ws-file-icon-graphic">{iconSvg}</div>
+        <span className="ws-file-icon-label" style={{ color: iconColor }}>{label}</span>
       </div>
     );
+  };
+
+  const getButtonTheme = (filePath) => {
+    const ext = filePath.split('.').pop().toLowerCase();
+    const lower = filePath.toLowerCase();
+    if (lower.includes('examples/') && (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx')) return 'pink';
+    if (lower.includes('examples/')) return 'orange';
+    if (ext === 'md') return 'blue';
+    if (ext === 'json') return 'green';
+    if (ext === 'js' || ext === 'jsx') return 'orange';
+    if (ext === 'ts' || ext === 'tsx') return 'blue';
+    if (ext === 'css') return 'purple';
+    return 'blue';
+  };
+
+  const getDotColor = (filePath) => {
+    const ext = filePath.split('.').pop().toLowerCase();
+    const lower = filePath.toLowerCase();
+    if (lower.includes('examples/') && (ext === 'js' || ext === 'jsx')) return '#F43F5E';
+    if (lower.includes('examples/')) return '#F59E0B';
+    if (ext === 'md') return '#3B82F6';
+    if (ext === 'json') return '#10B981';
+    if (ext === 'js' || ext === 'jsx') return '#F59E0B';
+    if (ext === 'ts' || ext === 'tsx') return '#3B82F6';
+    if (ext === 'css') return '#7C3AED';
+    return '#6B7280';
+  };
+
+  const getTechLogo = (name) => {
+    const n = name.toLowerCase();
+    // Each returns a small 16×16 inline SVG or styled span
+    if (n.includes('react'))
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#61DAFB" strokeWidth="2"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" style={{transform:'rotate(60deg)',transformOrigin:'50% 50%'}}/><ellipse cx="12" cy="12" rx="10" ry="4" style={{transform:'rotate(120deg)',transformOrigin:'50% 50%'}}/></svg>;
+    if (n.includes('typescript') || n === 'ts')
+      return <span style={{background:'#3178C6',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>TS</span>;
+    if (n.includes('javascript') || n === 'js')
+      return <span style={{background:'#F7DF1E',color:'#111',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>JS</span>;
+    if (n.includes('node'))
+      return <span style={{background:'#339933',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>N</span>;
+    if (n.includes('express'))
+      return <span style={{background:'#000',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>Ex</span>;
+    if (n.includes('next'))
+      return <span style={{background:'#000',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>N↗</span>;
+    if (n.includes('vite'))
+      return <span style={{background:'#646CFF',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>V</span>;
+    if (n.includes('vue'))
+      return <span style={{background:'#42B883',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>V</span>;
+    if (n.includes('tailwind'))
+      return <span style={{background:'#38BDF8',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>TW</span>;
+    if (n.includes('mongo'))
+      return <span style={{background:'#13AA52',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>M</span>;
+    if (n.includes('prisma'))
+      return <span style={{background:'#2D3748',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>P</span>;
+    if (n.includes('graphql'))
+      return <span style={{background:'#E10098',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>G</span>;
+    if (n.includes('jest'))
+      return <span style={{background:'#C21325',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>J</span>;
+    if (n.includes('mocha'))
+      return <span style={{background:'#8D6748',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>M</span>;
+    if (n.includes('eslint'))
+      return <span style={{background:'#4B32C3',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>E</span>;
+    if (n.includes('prettier'))
+      return <span style={{background:'#F7B93E',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>P</span>;
+    if (n.includes('webpack'))
+      return <span style={{background:'#8DD6F9',color:'#111',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>W</span>;
+    if (n.includes('redux'))
+      return <span style={{background:'#764ABC',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>Rx</span>;
+    if (n.includes('axios'))
+      return <span style={{background:'#5A29E4',color:'#fff',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>Ax</span>;
+    // Default: first 2 chars of name
+    return <span style={{background:'#E2E8F0',color:'#475569',fontSize:'0.55rem',fontWeight:800,padding:'1px 3px',borderRadius:3,fontFamily:'monospace',lineHeight:1}}>{name.slice(0,2)}</span>;
   };
 
   const getCategoryTag = (filePath) => {
@@ -571,50 +688,120 @@ function App() {
           <div className="workspace-dashboard" style={{ display: selectedFile ? 'none' : 'block' }}>
             {/* Repo Header Card */}
             <div className="ws-header-card">
+              {/* Left: avatar + info */}
               <div className="ws-header-left">
-                <div className="ws-repo-avatar">
-                  {analysisData?.repo ? analysisData.repo.slice(0, 2).toLowerCase() : 'fc'}
+                <div className="ws-repo-avatar-wrap">
+                  <div className="ws-repo-avatar">
+                    {analysisData?.repo ? analysisData.repo.slice(0, 2).toLowerCase() : 'fc'}
+                  </div>
+                  <span className="ws-avatar-dot"></span>
                 </div>
                 <div className="ws-repo-info">
                   <h2 className="ws-repo-name">
                     <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" className="ws-repo-link">
                       {analysisData?.owner}/{analysisData?.repo}
-                      <span className="ws-external-icon">↗</span>
+                    </a>
+                    <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" className="ws-external-btn" aria-label="Open on GitHub">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                   </h2>
-                  <p className="ws-repo-desc">{repoDescription || 'Fast, unopinionated, minimalist web framework for Node.js'}</p>
-                  <div className="ws-badges">
-                    {analysisData?.stars && <span className="ws-badge">★ {formatStars(analysisData.stars)}</span>}
-                    {analysisData?.language && <span className="ws-badge">{analysisData.language}</span>}
-                    {analysisData?.filesCount && <span className="ws-badge">{analysisData.filesCount} files</span>}
+                  {repoDescription && <p className="ws-repo-desc">{repoDescription}</p>}
+
+                  {/* Stat boxes */}
+                  <div className="ws-stat-boxes">
+                    {analysisData?.stars && (
+                      <div className="ws-stat-box">
+                        <div className="ws-stat-top">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          <span className="ws-stat-value">{formatStars(analysisData.stars)}</span>
+                        </div>
+                        <span className="ws-stat-label">Stars</span>
+                      </div>
+                    )}
+                    {analysisData?.language && (
+                      <div className="ws-stat-box">
+                        <div className="ws-stat-top">
+                          <span className="ws-lang-badge">JS</span>
+                          <span className="ws-stat-value">{analysisData.language}</span>
+                        </div>
+                        <span className="ws-stat-label">Primary language</span>
+                      </div>
+                    )}
+                    {analysisData?.filesCount && (
+                      <div className="ws-stat-box">
+                        <div className="ws-stat-top">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                          <span className="ws-stat-value">{analysisData.filesCount}</span>
+                        </div>
+                        <span className="ws-stat-label">Files</span>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Tech Stack */}
+                  {techStack.length >= 2 && (
+                    <div className="ws-header-tech-stack">
+                      <div className="ws-tech-stack-heading">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+                        <span className="ws-tech-stack-label">TECH STACK</span>
+                      </div>
+                      <div className="ws-tech-stack-pills">
+                        {techStack.slice(0, 4).map(t => (
+                          <span key={t} className="ws-tech-pill">
+                            {getTechLogo(t)}
+                            {t}
+                          </span>
+                        ))}
+                        {techStack.length > 4 && (
+                          <span className="ws-tech-pill ws-tech-more">+{techStack.length - 4} more</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="ws-header-right">
-                <button className="ws-rescan-btn" onClick={handleRescan} disabled={isLoading}>
-                  ↺ Re-scan
-                </button>
-                <div className="ws-illustrations">
-                  <svg width="140" height="90" viewBox="0 0 140 90" fill="none" style={{ opacity: 0.9 }}>
-                    <rect x="5" y="20" width="95" height="60" rx="6" fill="none" stroke="#E5E7EB" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <rect x="50" y="8" width="85" height="65" rx="8" fill="#FFFFFF" stroke="#E5E7EB" strokeWidth="1.5" />
-                    <path d="M50 16C50 11.5817 53.5817 8 58 8H127C131.418 8 135 11.5817 135 16V22H50V16Z" fill="#1E293B" />
-                    <circle cx="58" cy="14" r="2" fill="#EF4444" />
-                    <circle cx="64" cy="14" r="2" fill="#F59E0B" />
-                    <circle cx="70" cy="14" r="2" fill="#10B981" />
-                    <text x="92" y="45" fill="#3B82F6" fontFamily="monospace" fontSize="20" fontWeight="700" textAnchor="middle">&lt;/&gt;</text>
-                    <rect x="65" y="54" width="40" height="2.5" rx="1" fill="#E2E8F0" />
-                    <rect x="65" y="60" width="55" height="2.5" rx="1" fill="#E2E8F0" />
-                  </svg>
-                </div>
+
+              {/* Right: illustration */}
+              <div className="ws-header-illustration">
+                <svg width="200" height="130" viewBox="0 0 200 130" fill="none">
+                  {/* Back document */}
+                  <rect x="8" y="28" width="110" height="80" rx="8" fill="none" stroke="#E2E8F0" strokeWidth="1.5" strokeDasharray="4 3"/>
+                  {/* Browser window */}
+                  <rect x="55" y="10" width="120" height="88" rx="10" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="1.5"/>
+                  {/* Titlebar */}
+                  <rect x="55" y="10" width="120" height="24" rx="10" fill="#1E293B"/>
+                  <rect x="55" y="22" width="120" height="12" fill="#1E293B"/>
+                  <circle cx="68" cy="22" r="3.5" fill="#EF4444"/>
+                  <circle cx="79" cy="22" r="3.5" fill="#F59E0B"/>
+                  <circle cx="90" cy="22" r="3.5" fill="#10B981"/>
+                  {/* Code symbol */}
+                  <text x="115" y="68" fill="#3B82F6" fontFamily="monospace" fontSize="28" fontWeight="800" textAnchor="middle">&lt;/&gt;</text>
+                  {/* Lines */}
+                  <rect x="75" y="80" width="50" height="3" rx="1.5" fill="#E2E8F0"/>
+                  <rect x="75" y="87" width="70" height="3" rx="1.5" fill="#E2E8F0"/>
+                  {/* Floating doc */}
+                  <rect x="130" y="75" width="58" height="45" rx="8" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="1.5"/>
+                  <rect x="140" y="86" width="38" height="3" rx="1.5" fill="#CBD5E1"/>
+                  <rect x="140" y="93" width="28" height="3" rx="1.5" fill="#CBD5E1"/>
+                  <rect x="140" y="100" width="33" height="3" rx="1.5" fill="#CBD5E1"/>
+                  <rect x="140" y="107" width="20" height="3" rx="1.5" fill="#CBD5E1"/>
+                </svg>
               </div>
             </div>
 
             {/* Read Order Heading Row */}
             <div className="ws-tabs-new">
-              <div>
-                <h3 className="ws-tabs-title"><span style={{ marginRight: '0.4rem' }}>📋</span>Read Order</h3>
-                <p className="ws-tabs-subtitle">A recommended sequence to understand this repository step by step.</p>
+              <div className="ws-tabs-title-row">
+                <div className="ws-tabs-book-badge">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="ws-tabs-title">Read Order</h3>
+                  <p className="ws-tabs-subtitle">A recommended sequence to understand this repository step by step.</p>
+                </div>
               </div>
               <span className="ws-count-badge">{analysisData.readingList.length} items</span>
             </div>
@@ -634,9 +821,11 @@ function App() {
                 <div className="ws-list-timeline">
                   {analysisData.readingList.map((file, i) => {
                     const cat = getCategoryTag(file.path);
+                    const theme = getButtonTheme(file.path);
+                    const dotColor = getDotColor(file.path);
                     return (
                       <div key={file.path} className="ws-timeline-item">
-                        <div className="ws-timeline-badge">{i + 1}</div>
+                        <div className="ws-timeline-dot" style={{ backgroundColor: dotColor }}></div>
                         <div className="ws-item-timeline-card">
                           {getFileIconLayout(file.path)}
                           <div className="ws-item-info">
@@ -646,28 +835,19 @@ function App() {
                                 {cat.text}
                               </span>
                             </div>
-                            <div className="ws-item-body">
-                              <p className="ws-item-explanation">→ {file.explanation}</p>
-                              <p className="ws-item-reason">→ {file.reason}</p>
-                            </div>
+                            <ul className="ws-item-body">
+                              <li className="ws-item-explanation">{file.explanation}</li>
+                              <li className="ws-item-reason">{file.reason}</li>
+                            </ul>
                           </div>
-                          <button className="ws-timeline-btn" onClick={() => handleReadFile(file.path)}>
+                          <button className={`ws-timeline-btn ws-btn-${theme}`} onClick={() => handleReadFile(file.path)}>
                             Read Code &amp; Explanation
-                            <span className="ws-chevron">›</span>
+                            <span className="ws-chevron">→</span>
                           </button>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-
-                {/* Tip Card */}
-                <div className="ws-tip-card">
-                  <div className="ws-tip-icon-circle">!</div>
-                  <div className="ws-tip-content">
-                    <h4 className="ws-tip-title">Tip</h4>
-                    <p className="ws-tip-text">Follow this order for the best learning experience. Each file builds context for the next one.</p>
-                  </div>
                 </div>
               </div>
             )}

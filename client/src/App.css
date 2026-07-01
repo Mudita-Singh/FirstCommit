@@ -34,6 +34,13 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   align-items: stretch; /* children fill full width */
 }
 
+.workspace-page {
+  min-height: 100vh;
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(209,213,219,0.45) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
 
 
 /* ── Main ── */
@@ -474,41 +481,47 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   color: var(--blue-dark);
 }
 
-/* Dashboard */
+/* Dashboard — dot-grid background */
 .workspace-dashboard {
-  max-width: 900px;
+  max-width: 1100px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 2rem 4rem; /* px-8 on desktop is 2rem */
+  padding: 2.5rem 2.5rem 5rem;
   animation: fadeUp 0.25s ease;
   box-sizing: border-box;
 }
 
-/* Header card redesign */
+/* Header card */
 .ws-header-card {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
-  border-radius: 12px;
-  padding: 1.25rem; /* reduced internal padding */
+  border-radius: 18px;
+  padding: 2rem 2.5rem;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 2.0rem; /* distance from header card to read order title: 2rem */
-  position: relative;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2rem;
   box-sizing: border-box;
 }
 
 .ws-header-left {
   display: flex;
-  gap: 1rem;
   align-items: flex-start;
-  flex-grow: 1;
+  gap: 1.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Avatar with green status dot */
+.ws-repo-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .ws-repo-avatar {
-  width: 48px; /* adjusted size */
-  height: 48px; /* adjusted size */
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: #111827;
   color: #FFFFFF;
@@ -516,117 +529,208 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem; /* adjusted size */
+  font-size: 1.2rem;
   text-transform: lowercase;
   flex-shrink: 0;
+}
+
+.ws-avatar-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2px solid #FFFFFF;
 }
 
 .ws-repo-info {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
 }
 
 .ws-repo-name {
-  font-size: 1.3rem; /* adjusted size */
-  font-weight: 700;
-  color: #111827;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0F172A;
   margin: 0;
   display: flex;
   align-items: center;
-}
-
-.ws-repo-link {
-  color: #111827;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.ws-external-icon {
-  color: #9CA3AF;
-  font-size: 0.95rem;
-  margin-left: 0.25rem;
-  font-weight: normal;
-}
-
-.ws-repo-desc {
-  font-size: 0.875rem;
-  color: #6B7280;
-  margin: 0.25rem 0 0.5rem 0; /* repo description margin */
-  line-height: 1.4;
-}
-
-.ws-badges {
-  display: flex;
   gap: 0.5rem;
 }
 
-.ws-badge {
-  background: #F9FAFB;
-  border: 1px solid #E5E7EB;
-  color: #4B5563;
-  border-radius: 6px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.78rem;
-  font-weight: 500;
+.ws-repo-link {
+  color: #0F172A;
+  text-decoration: none;
+}
+
+.ws-repo-link:hover { text-decoration: underline; }
+
+.ws-external-btn {
   display: inline-flex;
   align-items: center;
-}
-
-.ws-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.75rem;
-  flex-shrink: 0;
-}
-
-.ws-rescan-btn {
-  background: #FFFFFF;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   border: 1px solid #E5E7EB;
   color: #6B7280;
-  border-radius: 8px;
-  padding: 0.25rem 0.75rem; /* px-3 py-1.5 */
-  font-size: 0.8rem;
-  font-family: var(--font);
-  font-weight: 500;
-  cursor: pointer;
+  text-decoration: none;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 
-.ws-rescan-btn:hover {
-  border-color: #9CA3AF;
-  color: #374151;
+.ws-external-btn:hover {
+  border-color: #3B82F6;
+  color: #3B82F6;
+  background: #EFF6FF;
 }
 
-.ws-illustrations {
+.ws-repo-desc {
+  font-size: 0.9rem;
+  color: #64748B;
+  margin: 0.1rem 0 0.75rem;
+  line-height: 1.5;
+}
+
+/* Stat boxes */
+.ws-stat-boxes {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.ws-stat-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 0.5rem 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 80px;
+}
+
+.ws-stat-top {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.4rem;
 }
+
+.ws-stat-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.ws-stat-label {
+  font-size: 0.7rem;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.ws-lang-badge {
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+/* Tech Stack */
+.ws-header-tech-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ws-tech-stack-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ws-tech-stack-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.1em;
+}
+
+.ws-tech-stack-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ws-tech-pill {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  color: #374151;
+  border-radius: 8px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ws-tech-more {
+  color: #6B7280;
+  background: #F8FAFC;
+}
+
+/* Illustration on the right */
+.ws-header-illustration {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
 
 /* Heading Row */
 .ws-tabs-new {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.25rem; /* Heading Row to first card: 1.25rem */
+  margin-bottom: 1.25rem;
+}
+
+.ws-tabs-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ws-tabs-book-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .ws-tabs-title {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #111827;
   margin: 0;
-  display: flex;
-  align-items: center;
 }
 
 .ws-tabs-subtitle {
   font-size: 0.8rem;
   color: #6B7280;
-  margin: 0.25rem 0 0 0;
+  margin: 0.1rem 0 0 0;
 }
 
 .ws-count-badge {
@@ -636,7 +740,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 9999px;
-  padding: 0.25rem 0.75rem; /* px-3 py-1 */
+  padding: 0.25rem 0.75rem;
 }
 
 /* Timeline container */
@@ -667,23 +771,18 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   width: 100%;
 }
 
-.ws-timeline-badge {
+.ws-timeline-dot {
   position: absolute;
-  left: -3rem; /* Aligns circle badge on the absolute timeline line (offset left by 3rem, centered at left=0px) */
-  margin-left: 0px;
-  width: 32px;
-  height: 32px;
+  left: -3rem;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background-color: #3B82F6;
-  color: #FFFFFF;
-  font-size: 0.8rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #FFFFFF;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 0 0 1.5px #E5E7EB;
   z-index: 2;
   box-sizing: border-box;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .ws-error {
@@ -717,12 +816,13 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 
 .ws-item-timeline-card {
   display: flex;
-  align-items: center; /* vertically center all 3 columns */
-  gap: 1.25rem;
+  align-items: flex-start;
+  gap: 1.5rem;
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
   border-radius: 12px;
-  padding: 1.25rem 1.5rem;
+  padding: 1.25rem 1.75rem;
+  min-height: 110px;
   box-shadow: none;
   transition: all 0.2s ease;
   width: 100%;
@@ -735,20 +835,34 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   transform: translateY(-1px);
 }
 
-/* File icon colored box */
+/* File icon vertical box */
 .ws-file-icon-box {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  min-height: 68px;
   border-radius: 10px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  gap: 0.35rem;
+  padding: 0.5rem 0.25rem 0.4rem;
+  box-sizing: border-box;
 }
 
-.ws-file-mono-text {
+.ws-file-icon-graphic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.ws-file-icon-label {
   font-family: var(--mono);
-  color: #FFFFFF;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
 /* File info */
@@ -792,38 +906,38 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 
 .ws-item-body {
-  padding-left: 0;
+  list-style: disc;
+  padding-left: 1.1rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   margin-top: 0.5rem;
+  margin-bottom: 0;
 }
 
 .ws-item-explanation {
   font-family: var(--font);
   font-size: 0.875rem;
-  font-weight: 400;
-  color: #374151 !important; /* force correct color */
+  font-weight: 500;
+  color: #0F172A !important;
   text-decoration: none !important;
   line-height: 1.5;
-  margin: 0;
 }
 
 .ws-item-reason {
   font-family: var(--font);
-  font-size: 0.85rem; /* line 2 sizing */
+  font-size: 0.85rem;
   font-weight: 400;
-  color: #6B7280 !important; /* force correct color */
+  color: #475569 !important;
   text-decoration: none !important;
   line-height: 1.5;
-  margin: 0;
 }
 
-/* Action button styling */
+/* Action button base */
 .ws-timeline-btn {
   background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  color: #374151;
+  border: 1.5px solid #BFDBFE;
+  color: #3B82F6;
   border-radius: 8px;
   padding: 0.5rem 1rem;
   font-size: 0.8rem;
@@ -832,80 +946,45 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  width: 200px;
-  min-width: 190px;
+  width: 210px;
+  min-width: 200px;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
   align-self: center;
+  margin-top: 0.25rem;
   box-sizing: border-box;
+  gap: 0.5rem;
 }
 
 .ws-timeline-btn .ws-chevron {
-  color: #9CA3AF;
-  font-size: 1.1rem;
+  font-size: 1rem;
   line-height: 1;
-  margin-left: 0.375rem;
   transition: color 0.15s ease;
 }
 
-.ws-timeline-btn:hover {
-  background-color: #3B82F6;
-  color: #FFFFFF;
-  border-color: transparent;
-}
+/* Blue (default/md/ts) */
+.ws-btn-blue { border-color: #BFDBFE; color: #3B82F6; }
+.ws-btn-blue:hover { background: #3B82F6; color: #FFFFFF; border-color: #3B82F6; }
 
-.ws-timeline-btn:hover .ws-chevron {
-  color: #FFFFFF;
-}
+/* Green (json) */
+.ws-btn-green { border-color: #A7F3D0; color: #059669; }
+.ws-btn-green:hover { background: #10B981; color: #FFFFFF; border-color: #10B981; }
 
-/* Tip Card */
-.ws-tip-card {
-  background-color: #F0F9FF;
-  border: 1px solid #BFDBFE;
-  border-radius: 10px;
-  padding: 1rem 1.5rem;
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  margin-top: 1.5rem;
-  box-sizing: border-box;
-}
+/* Purple (css) */
+.ws-btn-purple { border-color: #DDD6FE; color: #7C3AED; }
+.ws-btn-purple:hover { background: #7C3AED; color: #FFFFFF; border-color: #7C3AED; }
 
-.ws-tip-icon-circle {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background-color: #3B82F6;
-  color: #FFFFFF;
-  font-size: 0.8rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+/* Orange (js/examples) */
+.ws-btn-orange { border-color: #FDE68A; color: #D97706; }
+.ws-btn-orange:hover { background: #F59E0B; color: #FFFFFF; border-color: #F59E0B; }
 
-.ws-tip-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
+/* Pink (example code js) */
+.ws-btn-pink { border-color: #FBCFE8; color: #BE185D; }
+.ws-btn-pink:hover { background: #EC4899; color: #FFFFFF; border-color: #EC4899; }
 
-.ws-tip-title {
-  font-weight: 700;
-  color: #1D4ED8;
-  font-size: 0.9rem;
-  margin: 0;
-}
-
-.ws-tip-text {
-  font-size: 0.82rem;
-  color: #3B82F6;
-  margin: 0;
-  line-height: 1.4;
-}
+.ws-timeline-btn:hover .ws-chevron { color: #FFFFFF; }
 
 /* Split View */
 .split-view {
