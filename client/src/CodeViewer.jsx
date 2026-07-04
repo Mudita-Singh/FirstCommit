@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { fetchRawFileContent, explainFileWithBlocksOnly } from './services/api';
+import { fetchRawFileContent, explainFileWithBlocksOnly, fetchFileUsages } from './services/api';
 
 /**
  * CodeViewer Component
@@ -14,7 +14,166 @@ import { fetchRawFileContent, explainFileWithBlocksOnly } from './services/api';
  * @param {string} filePath - File path to display and explain.
  * @param {function} onClose - Callback to close this view and return to dashboard.
  */
-export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
+function UsagesPanel({ repoOwner, repoName, filePath, onFileClick }) {
+  const [loading, setLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
+  const [usages, setUsages] = useState([]);
+  const [searchedFiles, setSearchedFiles] = useState(0);
+  const [totalFound, setTotalFound] = useState(0);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    let timer = null;
+
+    const loadUsages = async () => {
+      // Start a 150ms delay before showing the loading spinner to prevent flash for cached requests
+      timer = setTimeout(() => {
+        if (active) {
+          setShowLoading(true);
+        }
+      }, 150);
+
+      setError(null);
+      try {
+        const res = await fetchFileUsages(repoOwner, repoName, filePath);
+        if (active) {
+          if (res?.status === 'success') {
+            if (res.data.fromCache) {
+              clearTimeout(timer);
+              setShowLoading(false);
+            } else {
+              setShowLoading(true);
+            }
+            setUsages(res.data.usages || []);
+            setSearchedFiles(res.data.searchedFiles || 0);
+            setTotalFound(res.data.totalFound || 0);
+          } else {
+            throw new Error(res?.message || 'Failed to fetch usages');
+          }
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message || 'An error occurred while finding usages.');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+    loadUsages();
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [repoOwner, repoName, filePath]);
+
+  if (loading && showLoading) {
+    return (
+      <div className="cv-panel-loading" style={{ height: 'auto', padding: '2rem 0' }}>
+        <div className="spin-logo" style={{ fontSize: '24px', marginBottom: '1rem' }}>&lt;&gt;</div>
+        <p style={{ color: '#8b949e', fontSize: '0.88rem' }}>Searching {repoName} for imports...</p>
+      </div>
+    );
+  }
+
+  if (loading && !showLoading) {
+    return null;
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '1.5rem', color: '#EF4444', textAlign: 'center', fontSize: '0.875rem' }}>
+        Error searching usages: {error}
+      </div>
+    );
+  }
+
+  if (usages.length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '3rem 1.5rem',
+        color: '#8b949e',
+        fontSize: '0.875rem',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🔍</div>
+        No imports found in this repo's source files
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <h3 style={{
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: '#e6edf3',
+        margin: '0 0 0.5rem'
+      }}>
+        Found in <span style={{ color: '#58a6ff' }}>{totalFound}</span> {totalFound === 1 ? 'file' : 'files'}
+      </h3>
+      {usages.map((usage, idx) => (
+        <div 
+          key={idx}
+          style={{
+            border: '1px solid #30363d',
+            borderRadius: '8px',
+            backgroundColor: '#0d1117',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}
+        >
+          <div 
+            onClick={() => onFileClick(usage.filePath)}
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '0.82rem',
+              color: '#58a6ff',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              fontWeight: '600',
+              alignSelf: 'flex-start'
+            }}
+            className="breadcrumb-link"
+          >
+            {usage.filePath}
+          </div>
+          <div style={{
+            fontSize: '0.72rem',
+            color: '#8b949e',
+            fontWeight: '500'
+          }}>
+            Line {usage.line}:
+          </div>
+          <pre style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '0.8rem',
+            color: '#c9d1d9',
+            backgroundColor: '#161b22',
+            padding: '0.5rem',
+            borderRadius: '6px',
+            margin: 0,
+            overflowX: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all'
+          }}>
+            {usage.snippet}
+          </pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function CodeViewer({ repoOwner, repoName, filePath, onClose, onFileClick }) {
   // Independent loading flags — file fetch and AI explanation run as separate phases
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
@@ -33,7 +192,7 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
   const [language, setLanguage] = useState('javascript');
   
   // Tab states
-  const [activeTab, setActiveTab] = useState('explain'); // 'explain', 'simplify', 'where_used'
+  const [activeTab, setActiveTab] = useState('explain'); // 'explain', 'where_used'
   const [explanationBlocks, setExplanationBlocks] = useState([]);
   
   // Cache explanations to prevent fetching them multiple times when switching tabs
@@ -282,42 +441,20 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
             Explain this file
           </button>
           <button
-            className={`code-viewer-tab-btn ${activeTab === 'simplify' ? 'active' : ''}`}
-            onClick={() => setActiveTab('simplify')}
-          >
-            Simplify more
-          </button>
-          <button
             className={`code-viewer-tab-btn ${activeTab === 'where_used' ? 'active' : ''}`}
             onClick={() => setActiveTab('where_used')}
           >
             Where is this used
           </button>
         </div>
-
-        <button className="code-viewer-close-btn" onClick={onClose} aria-label="Close Code Viewer">
-          ✕ Close
-        </button>
       </header>
 
       {/* VIEWER BODY — split layout is ALWAYS visible */}
       <div className="code-viewer-body">
-        {activeTab === 'where_used' ? (
-          /* Coming Soon Placeholder Panel */
-          <div className="placeholder-panel">
-            <div className="placeholder-icon">🔗</div>
-            <h3 className="placeholder-title">Where is this used</h3>
-            <p className="placeholder-desc">
-              Coming soon — will show files that import this one.
-            </p>
-          </div>
-        ) : (
-          /* Code & AI Explanation — split view locked at all times */
-          <>
-            {/* LEFT PANEL — Source Code */}
-            <div className="code-viewer-panel left-panel">
-              <div className="code-viewer-panel-title">Source Code</div>
-              <div className="code-viewer-scroll-container">
+        {/* LEFT PANEL — Source Code */}
+        <div className="code-viewer-panel left-panel">
+          <div className="code-viewer-panel-title">Source Code</div>
+          <div className="code-viewer-scroll-container">
                 {isLoadingFile || !rawContent ? (
                   /* Small inline spinner — never hides the right panel */
                   <div className="cv-panel-loading">
@@ -349,12 +486,21 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
               </div>
             </div>
 
-            {/* RIGHT PANEL — AI Explanation */}
+            {/* RIGHT PANEL — AI Explanation OR Usages */}
             <div className="code-viewer-panel">
               <div className="code-viewer-panel-title">
-                {activeTab === 'simplify' ? 'Analogy-Rich Explanation' : 'AI Explanation'}
+                {activeTab === 'where_used' ? 'Usages' : 'AI Explanation'}
               </div>
-              <div className="code-viewer-explain-container" ref={explainScrollRef}>
+              <div className="code-viewer-explain-container ai-explanation-panel" ref={explainScrollRef}>
+                {activeTab === 'where_used' ? (
+                  <UsagesPanel
+                    repoOwner={repoOwner}
+                    repoName={repoName}
+                    filePath={filePath}
+                    onFileClick={onFileClick}
+                  />
+                ) : (
+                  <>
                 {error && !isLoadingFile && !isLoadingExplanation ? (
                   /* Error state — lives inside the right panel so left panel stays visible */
                   isGithubLimitError ? (
@@ -527,10 +673,10 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
                         borderRadius: '0 8px 8px 0',
                         marginBottom: '1rem',
                         fontSize: '0.9rem',
-                        lineHeight: '1.5',
-                        color: '#E2E8F0'
+                        lineHeight: '1.6',
+                        color: '#e6edf3'
                       }}>
-                        <strong style={{ display: 'block', marginBottom: '0.25rem', color: '#93C5FD', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>File Summary</strong>
+                        <strong style={{ display: 'block', marginBottom: '0.25rem', color: '#8b949e', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.1em' }}>File Summary</strong>
                         {summary}
                       </div>
                     )}
@@ -549,15 +695,23 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
                           <span key={idx} className="concept-pill" style={{
                             backgroundColor: 'rgba(255, 255, 255, 0.06)',
                             color: '#94A3B8',
-                            fontSize: '0.75rem',
+                            fontSize: '0.78rem',
                             fontWeight: '500',
-                            padding: '0.2rem 0.6rem',
+                            padding: '0.3rem 0.75rem',
                             borderRadius: '9999px',
                             border: '1px solid rgba(255, 255, 255, 0.1)',
                             display: 'inline-flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            gap: '0.35rem'
                           }}>
-                            💡 {concept}
+                            <span style={{
+                              width: '4px',
+                              height: '4px',
+                              borderRadius: '50%',
+                              backgroundColor: '#3b82f6',
+                              display: 'inline-block'
+                            }}></span>
+                            {concept}
                           </span>
                         ))}
                       </div>
@@ -583,9 +737,11 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
                         >
                           <div className="explanation-block-lines" style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: '0.75rem',
-                            color: '#64748B',
-                            marginBottom: '0.25rem'
+                            fontSize: '0.72rem',
+                            color: '#58a6ff',
+                            marginBottom: '0.25rem',
+                            letterSpacing: '0.05em',
+                            fontWeight: '600'
                           }}>
                             LINES {block.lines}
                           </div>
@@ -593,7 +749,7 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
                           <div className="explanation-block-title" style={{
                             fontWeight: '700',
                             fontSize: '0.95rem',
-                            color: activeBlockIndex === index ? '#60A5FA' : '#F8FAFC',
+                            color: '#e6edf3',
                             marginBottom: '0.5rem'
                           }}>
                             {block.title || `Section (Lines ${block.lines})`}
@@ -602,8 +758,8 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
                           {/* Conversational explanation — renders \n\n as paragraph breaks */}
                           <div className="explanation-block-body" style={{
                             fontSize: '0.875rem',
-                            lineHeight: '1.65',
-                            color: '#CBD5E1'
+                            lineHeight: '1.7',
+                            color: '#c9d1d9'
                           }}>
                             {(block.explanation || block.what || block.text || '').split('\n\n').map((para, i) => (
                               <p key={i} style={{ marginBottom: '0.5rem' }}>{para}</p>
@@ -614,10 +770,10 @@ export default function CodeViewer({ repoOwner, repoName, filePath, onClose }) {
                     )}
                   </>
                 )}
+                </>
+              )}
               </div>
             </div>
-          </>
-        )}
       </div>
     </div>
   );

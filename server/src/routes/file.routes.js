@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require('path').posix;
 const { fetchFileContent, fetchRepoStructure } = require('../services/github.service');
 const { generateBlockExplanation } = require('../services/ai.service');
+const { getCached, setCached } = require('../services/cache.service');
 
 /**
  * Returns a properly structured JSON error response for a caught error.
@@ -231,6 +232,19 @@ router.post('/usages', async (req, res) => {
   }
 
   try {
+    const cacheKey = `usages:${repoOwner}:${repoName}:${filePath}`;
+    const cached = await getCached(cacheKey, 'github');
+    if (cached) {
+      console.log('CACHE HIT (usages):', cacheKey);
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          ...cached,
+          fromCache: true
+        }
+      });
+    }
+    console.log('CACHE MISS (usages):', cacheKey);
     const rawTree = await fetchRepoStructure(repoOwner, repoName);
     const candidateFiles = rawTree.filter(file => {
       if (file.type !== 'blob') return false;
@@ -269,12 +283,20 @@ router.post('/usages', async (req, res) => {
       }
     }));
 
+    const result = {
+      usages,
+      searchedFiles: filesToSearch.length,
+      totalFound: usages.length
+    };
+
+    await setCached(cacheKey, 'github', 'fileUsages', result, 86400);
+    console.log('CACHED (usages):', cacheKey);
+
     return res.status(200).json({
       status: 'success',
       data: {
-        usages,
-        searchedFiles: filesToSearch.length,
-        totalFound: usages.length
+        ...result,
+        fromCache: false
       }
     });
   } catch (error) {

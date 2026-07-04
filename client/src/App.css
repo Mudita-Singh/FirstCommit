@@ -1114,9 +1114,10 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1.5rem;
-  background: #11131E;
-  border-bottom: 1px solid #1E293B;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
   flex-shrink: 0;
+  position: relative;
 }
 
 .code-viewer-filepath {
@@ -1130,14 +1131,17 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 
 .code-viewer-tabs {
   display: flex;
-  gap: 1.5rem;
+  gap: 2rem;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .code-viewer-tab-btn {
   font-family: var(--font);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #94A3B8;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #8b949e;
   padding: 0.75rem 0.25rem;
   background: transparent;
   transition: all 0.15s ease;
@@ -1147,12 +1151,13 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 
 .code-viewer-tab-btn:hover {
-  color: #F8FAFC;
+  color: #c9d1d9;
 }
 
 .code-viewer-tab-btn.active {
-  color: #FFFFFF;
-  border-bottom-color: #3B82F6;
+  color: #e6edf3;
+  border-bottom-color: #3b82f6;
+  background: transparent;
 }
 
 .code-viewer-close-btn {
@@ -1239,14 +1244,14 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   gap: 1.25rem;
   position: relative;
   scroll-behavior: smooth;
-  background: #0E0F16;
+  background: #0d1117;
 }
 
 .explanation-block {
   padding: 1.25rem;
   border-radius: 12px;
-  background: #141724;
-  border: 1px solid #1E293B;
+  background: #161b22;
+  border: 1px solid #30363d;
   transition: all 0.25s ease;
   scroll-margin-top: 1rem;
 }
@@ -1370,6 +1375,27 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .breadcrumb-link:hover {
   filter: brightness(1.2);
   text-decoration: underline;
+}
+
+/* ============================================================
+   CUSTOM SCROLLBARS FOR CODEVIEWER PANELS
+   ============================================================ */
+.ai-explanation-panel::-webkit-scrollbar,
+.code-viewer-scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+.ai-explanation-panel::-webkit-scrollbar-track,
+.code-viewer-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ai-explanation-panel::-webkit-scrollbar-thumb,
+.code-viewer-scroll-container::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 2px;
+}
+.ai-explanation-panel::-webkit-scrollbar-thumb:hover,
+.code-viewer-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
 }
 
 

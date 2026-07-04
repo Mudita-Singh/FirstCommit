@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const cacheSchema = new mongoose.Schema({
   cacheKey: { type: String, required: true },
   model: { type: String, required: true },  
-  type: { type: String, enum: ['readOrder', 'fileExplanation'] },
+  type: { type: String, enum: ['readOrder', 'fileExplanation', 'fileUsages'] },
+  ttl: { type: Number, default: 604800 },
   response: { type: mongoose.Schema.Types.Mixed },
   createdAt: { type: Date, default: Date.now, expires: 604800 }
 });

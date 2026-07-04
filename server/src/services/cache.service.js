@@ -31,7 +31,7 @@ async function getCached(cacheKey, model) {
  * Cache a response for the given cacheKey, model, and type.
  * Uses findOneAndUpdate with upsert to prevent unique key constraint violations.
  */
-async function setCached(cacheKey, model, type, response) {
+async function setCached(cacheKey, model, type, response, ttl = 604800) {
   if (!isDbConnected()) {
     return null;
   }
@@ -39,7 +39,7 @@ async function setCached(cacheKey, model, type, response) {
   try {
     await Cache.findOneAndUpdate(
       { cacheKey, model },
-      { type, response, createdAt: new Date() },
+      { type, response, ttl, createdAt: new Date() },
       { upsert: true, returnDocument: 'after' }
     );
     console.log('Cache write successful:', cacheKey);

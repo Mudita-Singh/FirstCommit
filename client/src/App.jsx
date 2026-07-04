@@ -865,6 +865,7 @@ function App() {
               repoName={analysisData.repo}
               filePath={selectedFile.path}
               onClose={handleBackToDashboard}
+              onFileClick={handleReadFile}
             />
           )}
         </div>
