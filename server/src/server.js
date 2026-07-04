@@ -39,11 +39,13 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 const healthRouter = require('./routes/health.routes');
 const repoRouter = require('./routes/repo.routes');
 const fileRouter = require('./routes/file.routes');
+const issueRouter = require('./routes/issue.routes');
 
 // Mount routes
 app.use('/api/health', healthRouter);
 app.use('/api/repo', repoRouter);
 app.use('/api/file', fileRouter);
+app.use('/api/issues', issueRouter);
 
 // Start listening for incoming network requests
 app.listen(PORT, () => {

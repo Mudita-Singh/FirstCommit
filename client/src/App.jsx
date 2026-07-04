@@ -3,6 +3,7 @@ import { fetchHealth, analyzeRepository, fetchFileExplanation, fetchRawFileConte
 import CodeViewer from './CodeViewer';
 import Navbar from './Navbar';
 import Breadcrumb from './components/Breadcrumb';
+import IssueExplorer from './components/IssueExplorer';
 import './App.css';
 
 // ─── single source of truth for repo analysis ────────────────────────────────
@@ -21,6 +22,7 @@ function App() {
   const [isViewerLoading, setIsViewerLoading] = useState(false);
   const [techStack, setTechStack] = useState([]);
   const [repoDescription, setRepoDescription] = useState('');
+  const [activeTab, setActiveTab] = useState('readOrder');
 
   // Ref to track latest analysisData in popstate closure
   const analysisDataRef = useRef(analysisData);
@@ -74,6 +76,7 @@ function App() {
         const data = response.data;
         data.fullName = `${data.owner}/${data.repo}`;
         setAnalysisData(data);
+        window.scrollTo({ top: 0, behavior: 'instant' });
       } else {
         throw new Error(response.message || 'Failed to analyze repository');
       }
@@ -108,13 +111,14 @@ function App() {
     setFileCode('');
     setFileExplanation('');
     setError(null);
+    setActiveTab('readOrder');
     window.scrollTo(0, 0);
   };
 
   // Scroll to top when analysis completes and the Read Order list mounts
   useEffect(() => {
     if (analysisData) {
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [analysisData]);
 
@@ -216,13 +220,22 @@ function App() {
     if (!fileObj) { setError(`Could not locate: ${path}`); return; }
     readOrderScrollPos.current = window.scrollY;
     setSelectedFile(fileObj);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleBackToDashboard = () => {
     setSelectedFile(null);
-    setTimeout(() => {
-      window.scrollTo(0, readOrderScrollPos.current);
-    }, 0);
+    requestAnimationFrame(() => {
+      window.scrollTo({ 
+        top: readOrderScrollPos.current, 
+        behavior: 'instant' 
+      });
+    });
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleScrollSync = (source) => {
@@ -465,7 +478,7 @@ function App() {
   // RENDER
   // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div className={isHome ? 'home-page' : 'workspace-page'}>
+    <div className={isHome ? 'home-page' : `workspace-page${selectedFile ? ' has-active-file' : ''}`}>
 
       {/* ── HOMEPAGE ─────────────────────────────────────────────────────── */}
       {isHome && (
@@ -797,20 +810,76 @@ function App() {
             </div>
 
             {/* Read Order Heading Row */}
+            {/* Tab Bar */}
             <div className="ws-tabs-new">
-              <div className="ws-tabs-title-row">
-                <div className="ws-tabs-book-badge">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                  </svg>
+              <div className="ws-tabs-title-row" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                {/* Read Order Tab */}
+                <div 
+                  onClick={() => handleTabChange('readOrder')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    cursor: 'pointer',
+                    opacity: activeTab === 'readOrder' ? 1 : 0.5,
+                    borderBottom: activeTab === 'readOrder' ? '2px solid #3B82F6' : '2px solid transparent',
+                    paddingBottom: '0.5rem',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div className="ws-tabs-book-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="ws-tabs-title" style={{ fontSize: '1.2rem' }}>Read Order</h3>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="ws-tabs-title">Read Order</h3>
-                  <p className="ws-tabs-subtitle">A recommended sequence to understand this repository step by step.</p>
+
+                {/* Issues Tab */}
+                <div 
+                  onClick={() => handleTabChange('issues')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    cursor: 'pointer',
+                    opacity: activeTab === 'issues' ? 1 : 0.5,
+                    borderBottom: activeTab === 'issues' ? '2px solid #3B82F6' : '2px solid transparent',
+                    paddingBottom: '0.5rem',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div className="ws-tabs-book-badge" style={{ backgroundColor: '#EDE9FE', borderColor: '#BFDBFE' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6"/>
+                      <line x1="8" y1="12" x2="21" y2="12"/>
+                      <line x1="8" y1="18" x2="21" y2="18"/>
+                      <line x1="3" y1="6" x2="3.01" y2="6"/>
+                      <line x1="3" y1="12" x2="3.01" y2="12"/>
+                      <line x1="3" y1="18" x2="3.01" y2="18"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="ws-tabs-title" style={{ fontSize: '1.2rem' }}>Issues</h3>
+                  </div>
                 </div>
               </div>
-              <span className="ws-count-badge">{analysisData.readingList.length} items</span>
+
+              {activeTab === 'readOrder' && (
+                <span className="ws-count-badge">{analysisData.readingList.length} items</span>
+              )}
+            </div>
+
+            {/* Subtitles below the tabs depending on activeTab */}
+            <div style={{ marginBottom: '1.5rem', marginTop: '-0.5rem' }}>
+              {activeTab === 'readOrder' ? (
+                <p className="ws-tabs-subtitle">A recommended sequence to understand this repository step by step.</p>
+              ) : (
+                <p className="ws-tabs-subtitle">Browse and analyze open issues in this repository.</p>
+              )}
             </div>
 
             {error && <div className="ws-error">[ ERROR ] {error}</div>}
@@ -822,7 +891,7 @@ function App() {
               </div>
             )}
 
-            {!isLoading && !isViewerLoading && analysisData?.readingList && (
+            {activeTab === 'readOrder' && !isLoading && !isViewerLoading && analysisData?.readingList && (
               <div className="ws-timeline-container">
                 <div className="ws-timeline-line"></div>
                 <div className="ws-list-timeline">
@@ -857,6 +926,14 @@ function App() {
                   })}
                 </div>
               </div>
+            )}
+            {activeTab === 'issues' && !isLoading && !isViewerLoading && (
+              <IssueExplorer 
+                owner={analysisData.owner}
+                repo={analysisData.repo}
+                fileTree={analysisData.files.map(f => f.path)}
+                onFileOpen={handleReadFile}
+              />
             )}
           </div>
           {selectedFile && (

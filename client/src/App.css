@@ -451,6 +451,21 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   height: 64px;
 }
 
+/* Purple header styling when split view editor is active */
+.workspace-page.has-active-file .site-header-shared.is-workspace {
+  background: #EDE9FE;
+  border-bottom: 1px solid #DBCDFB;
+  box-shadow: 0 1px 3px 0 rgba(124, 58, 237, 0.1);
+}
+
+.workspace-page.has-active-file .site-header-shared.is-workspace .logo-svg {
+  color: #7C3AED;
+}
+
+.workspace-page.has-active-file .site-header-shared.is-workspace .header-logo-btn:hover .logo-text {
+  color: #6D28D9;
+}
+
 .site-header-shared .navbar-container {
   width: 100%;
 }
