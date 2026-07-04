@@ -35,7 +35,9 @@ export const analyzeRepository = async (url) => {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.message || `Server returned error status: ${response.status}`);
+      const err = new Error(result.message || `Server returned error status: ${response.status}`);
+      err.status = response.status;
+      throw err;
     }
 
     return result;
@@ -147,7 +149,9 @@ export const explainFileWithBlocksOnly = async (filePath, rawContent, simplify =
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.message || `Server returned error status: ${response.status}`);
+      const err = new Error(result.message || `Server returned error status: ${response.status}`);
+      err.status = response.status;
+      throw err;
     }
 
     return result;

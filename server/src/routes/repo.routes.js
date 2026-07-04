@@ -4,6 +4,46 @@ const parseGithubUrl = require('../utils/githubParser');
 const { fetchRepoStructure, fetchRepoMetadata } = require('../services/github.service');
 const { generateReadingList, generateFileExplanation } = require('../services/ai.service');
 
+/**
+ * Returns a properly structured JSON error response for a caught error.
+ * Detects Gemini 429/quota errors and surfaces them with a specific status code.
+ */
+function handleRouteError(res, error, context) {
+  console.error(`Repo route error [${context}]:`, error.message);
+  const isGithubLimit =
+    error.githubRateLimit ||
+    error.status === 403 ||
+    error.status === 429 ||
+    error.message?.toLowerCase().includes('rate limit') ||
+    error.message?.toLowerCase().includes('github api returned status 403') ||
+    error.message?.toLowerCase().includes('github api returned status 429');
+
+  if (isGithubLimit) {
+    return res.status(403).json({
+      error: 'GitHub rate limit exceeded',
+      message: 'Too many requests to GitHub. Add a GitHub token to increase limit to 5000/hour.',
+      retryAfter: 3600
+    });
+  }
+
+  const isQuota =
+    error.message?.includes('429') ||
+    error.message?.includes('quota') ||
+    error.message?.includes('Too Many Requests') ||
+    error.message?.toLowerCase().includes('resource has been exhausted');
+  if (isQuota) {
+    return res.status(429).json({
+      error: 'AI quota exceeded',
+      message: 'Daily AI limit reached. Please try again tomorrow.',
+      retryAfter: 30
+    });
+  }
+  return res.status(500).json({
+    status: 'error',
+    message: error.message || 'An unexpected error occurred.'
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FILE FILTER
 // Shared between the pre-AI filter AND the post-AI sanity check (defence-in-depth).
@@ -156,11 +196,7 @@ router.post('/structure', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in /repo/structure:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to analyze repository.'
-    });
+    return handleRouteError(res, error, '/repo/structure');
   }
 });
 
@@ -190,11 +226,7 @@ router.post('/explain', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in /repo/explain:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to generate code explanation.'
-    });
+    return handleRouteError(res, error, '/repo/explain');
   }
 });
 

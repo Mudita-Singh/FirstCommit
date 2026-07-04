@@ -12,19 +12,11 @@
  * @returns {Promise<Array>} List of file objects in the repository tree.
  */
 async function fetchRepoStructure(owner, repo) {
-  const token = process.env.GITHUB_TOKEN;
-  
-  // Set up standard headers required by GitHub
-  // IMPORTANT: GitHub requires a User-Agent header. Without it, the API throws a 403 Forbidden.
   const headers = {
     'Accept': 'application/vnd.github.v3+json',
-    'User-Agent': 'FirstCommit-Dev-Application'
+    'User-Agent': 'FirstCommit-Dev-Application',
+    ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
   };
-
-  // Add the Personal Access Token if it is configured in the server's .env file
-  if (token) {
-    headers['Authorization'] = `token ${token}`;
-  }
 
   // Attempt to fetch from 'main' first, and fallback to 'master' if it fails
   const branchesToTry = ['main', 'master'];
@@ -34,6 +26,13 @@ async function fetchRepoStructure(owner, repo) {
     try {
       const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
       const response = await fetch(url, { headers });
+
+      if (response.status === 403 || response.status === 429) {
+        const err = new Error('GitHub rate limit exceeded');
+        err.status = response.status;
+        err.githubRateLimit = true;
+        throw err;
+      }
 
       if (response.status === 404) {
         // If 404, it might mean the branch doesn't exist, we will try the next branch
@@ -70,20 +69,22 @@ async function fetchRepoStructure(owner, repo) {
  * @returns {Promise<object>} Metadata object { stars, language }.
  */
 async function fetchRepoMetadata(owner, repo) {
-  const token = process.env.GITHUB_TOKEN;
-  
   const headers = {
     'Accept': 'application/vnd.github.v3+json',
-    'User-Agent': 'FirstCommit-Dev-Application'
+    'User-Agent': 'FirstCommit-Dev-Application',
+    ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
   };
-
-  if (token) {
-    headers['Authorization'] = `token ${token}`;
-  }
 
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}`;
     const response = await fetch(url, { headers });
+
+    if (response.status === 403 || response.status === 429) {
+      const err = new Error('GitHub rate limit exceeded');
+      err.status = response.status;
+      err.githubRateLimit = true;
+      throw err;
+    }
 
     if (!response.ok) {
       throw new Error(`GitHub metadata returned status ${response.status}`);
@@ -96,6 +97,10 @@ async function fetchRepoMetadata(owner, repo) {
     };
   } catch (error) {
     console.error(`⚠️ Failed to fetch metadata for ${owner}/${repo}:`, error.message);
+    // If it's a rate limit error, propagate it rather than falling back
+    if (error.githubRateLimit) {
+      throw error;
+    }
     // Return graceful fallback so the main analysis flow doesn't fail
     return {
       stars: 0,
@@ -114,19 +119,21 @@ async function fetchRepoMetadata(owner, repo) {
  * @returns {Promise<string>} Raw code content.
  */
 async function fetchFileContent(owner, repo, filePath) {
-  const token = process.env.GITHUB_TOKEN;
-  
   const headers = {
     'Accept': 'application/vnd.github.v3.raw',
-    'User-Agent': 'FirstCommit-Dev-Application'
+    'User-Agent': 'FirstCommit-Dev-Application',
+    ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
   };
-
-  if (token) {
-    headers['Authorization'] = `token ${token}`;
-  }
 
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
   const response = await fetch(url, { headers });
+
+  if (response.status === 403 || response.status === 429) {
+    const err = new Error('GitHub rate limit exceeded');
+    err.status = response.status;
+    err.githubRateLimit = true;
+    throw err;
+  }
 
   if (!response.ok) {
     throw new Error(`GitHub API returned status ${response.status} when fetching file content: ${response.statusText}`);

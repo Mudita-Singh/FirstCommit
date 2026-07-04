@@ -35,14 +35,16 @@ async function setCached(cacheKey, model, type, response) {
   if (!isDbConnected()) {
     return null;
   }
+  console.log('Attempting to write to cache:', cacheKey);
   try {
     await Cache.findOneAndUpdate(
       { cacheKey, model },
       { type, response, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
+    console.log('Cache write successful:', cacheKey);
   } catch (error) {
-    console.error('Error saving to cache:', error);
+    console.error('Cache write FAILED:', error.message);
   }
 }
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchHealth, analyzeRepository, fetchFileExplanation, fetchRawFileContent } from './services/api';
 import CodeViewer from './CodeViewer';
 import Navbar from './Navbar';
+import Breadcrumb from './components/Breadcrumb';
 import './App.css';
 
 // ─── single source of truth for repo analysis ────────────────────────────────
@@ -23,6 +24,7 @@ function App() {
 
   // Ref to track latest analysisData in popstate closure
   const analysisDataRef = useRef(analysisData);
+  const readOrderScrollPos = useRef(0);
   useEffect(() => {
     analysisDataRef.current = analysisData;
   }, [analysisData]);
@@ -36,12 +38,7 @@ function App() {
   useEffect(() => {
     const handlePop = (e) => {
       if (e.state?.view === 'workspace') {
-        if (e.state.file) {
-          const fileObj = analysisDataRef.current?.files?.find(f => f.path === e.state.file);
-          if (fileObj) setSelectedFile(fileObj);
-        } else {
-          setSelectedFile(null);
-        }
+        setSelectedFile(null);
       } else {
         // User pressed Back — return to homepage
         setAnalysisData(null);
@@ -74,7 +71,9 @@ function App() {
       if (response?.status === 'success') {
         // Push a new history entry so Back button works
         window.history.pushState({ view: 'workspace', url: cleanUrl }, '', '/workspace');
-        setAnalysisData(response.data);
+        const data = response.data;
+        data.fullName = `${data.owner}/${data.repo}`;
+        setAnalysisData(data);
       } else {
         throw new Error(response.message || 'Failed to analyze repository');
       }
@@ -103,11 +102,13 @@ function App() {
 
   const handleGoHome = () => {
     window.history.pushState({}, '', '/');
+    setRepoUrl('');
     setAnalysisData(null);
     setSelectedFile(null);
     setFileCode('');
     setFileExplanation('');
     setError(null);
+    window.scrollTo(0, 0);
   };
 
   // Scroll to top when analysis completes and the Read Order list mounts
@@ -213,15 +214,15 @@ function App() {
     if (!analysisData) return;
     const fileObj = analysisData.files.find(f => f.path === path);
     if (!fileObj) { setError(`Could not locate: ${path}`); return; }
+    readOrderScrollPos.current = window.scrollY;
     setSelectedFile(fileObj);
-    window.history.pushState({ view: 'workspace', file: path }, '', `/workspace?file=${encodeURIComponent(path)}`);
   };
 
   const handleBackToDashboard = () => {
     setSelectedFile(null);
-    if (window.history.state?.file) {
-      window.history.back();
-    }
+    setTimeout(() => {
+      window.scrollTo(0, readOrderScrollPos.current);
+    }, 0);
   };
 
   const handleScrollSync = (source) => {
@@ -684,6 +685,12 @@ function App() {
       {!isHome && (
         <div className="workspace-wrap">
           <Navbar isHome={false} onLogoClick={handleGoHome} />
+          <Breadcrumb
+            repoName={analysisData ? analysisData.fullName : null}
+            filePath={selectedFile ? selectedFile.path : null}
+            onHomeClick={handleGoHome}
+            onRepoClick={handleBackToDashboard}
+          />
 
           <div className="workspace-dashboard" style={{ display: selectedFile ? 'none' : 'block' }}>
             {/* Repo Header Card */}

@@ -2,7 +2,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const EXPLAIN_FILE_PROMPT = require('../prompts/explainFile.prompt');
 const { getCached, setCached } = require('./cache.service');
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+// In-flight request deduplication — prevents duplicate simultaneous Gemini calls
+// for the same cache key when two requests race before either one has written.
+const inFlightRequests = new Map();
 
 /**
  * AI Service
@@ -187,130 +191,150 @@ async function generateReadingList(repoName, files) {
       repo = match[2];
     }
   }
-  const cacheKey = `readOrder:${owner}:${repo}`;
+  const lockKey = `readOrder:${owner}:${repo}`;
 
-  try {
-    const cached = await getCached(cacheKey, GEMINI_MODEL);
-    if (cached) {
-      console.log(`CACHE HIT: [${cacheKey}]`);
-      return cached;
-    }
-    console.log(`CACHE MISS — calling Gemini`);
-  } catch (err) {
-    console.error('Cache get error in generateReadingList:', err);
+  // In-flight deduplication: if a request for this key is already running, share its promise
+  if (inFlightRequests.has(lockKey)) {
+    console.log('Waiting for in-flight request:', lockKey);
+    return inFlightRequests.get(lockKey);
   }
 
-  const client = getAIClient();
-  
-  if (!client) {
-    return getMockReadingList(files);
-  }
-
-  const systemInstruction =
-    `You are a senior open-source maintainer helping a brand-new contributor understand the repository "${repoName}".\n` +
-    `Your task: given a pre-filtered list of source file paths, produce an ordered JSON reading list of the 6-10 most important files to read first.\n` +
-    `\n` +
-    `STRICT RULES — violating any rule makes your output useless:\n` +
-    `\n` +
-    `1. ONLY use paths that appear verbatim in the input list. Do NOT invent or reference any path not present.\n` +
-    `\n` +
-    `2. SKIP any file that looks like tooling, config, or infrastructure even if it appears in the list:\n` +
-    `   - Anything inside a dot-directory (.agents, .github, .vscode, .husky, .cursor, .circleci, etc.)\n` +
-    `   - CI/CD config files (*.yml, *.yaml at the root level)\n` +
-    `   - Linter/formatter configs (.eslintrc, .prettierrc, .babelrc, tsconfig.json at root, etc.)\n` +
-    `   - Test fixtures, mocks, or snapshot files\n` +
-    `   - Lock files of any kind\n` +
-    `\n` +
-    `3. META-FILE CAP — in the first 5 results, at most 2 entries may be meta/documentation files.\n` +
-    `   Meta files are: CONTRIBUTING.md, DEVELOPERS.md, CODE_OF_CONDUCT.md, Makefile, LICENSE, CI config files, SECURITY.md, History.md, History,\n` +
-    `   any file whose name starts with CONTRIBUTING, DEVELOPERS, CODE_OF_CONDUCT, SECURITY, or SUPPORT.\n` +
-    `   The remaining slots in the top 5 MUST be filled with README/package.json and actual source code entry points:\n` +
-    `   package.json, index.js / index.ts, main.js, App.jsx/tsx, server.js, app.js, or files inside src/, lib/, app/, packages/.\n` +
-    `   If a large monorepo has many package subdirectories, pick one representative entry file per package, not multiple docs.\n` +
-    `\n` +
-    `4. Prioritise in this order: README → root package.json → main entry points → core routing/config → domain logic → utilities.\n` +
-    `\n` +
-    `5. UNIQUE FILE-SPECIFIC EXPLANATIONS — this is the most critical rule:\n` +
-    `   For EVERY single file, you must write explanations based on that file's REAL, SPECIFIC content and purpose. Never reuse the same sentence structure, phrasing, or wording across different files.\n` +
-    `   - SILENT CATEGORIZATION: For each file path, you MUST first silently identify the file's category (e.g. changelog/release history, license, configuration, build script, source code view, domain helper, example demo, markdown documentation) based on its extension, name, and folder location.\n` +
-    `   - Ground your explanation and reason fields entirely in that identified file category.\n` +
-    `   - If you cannot determine specific value for a file, exclude it rather than generating a generic placeholder.\n` +
-    `\n` +
-    `   INLINE EXAMPLES (Use these to guide your pattern, do not copy-paste them):\n` +
-    `   - File: "Dockerfile"\n` +
-    `     * BAD: "Dockerfile inside the project root — defines the module-level logic for that layer of the application." (Factually wrong, templated)\n` +
-    `     * GOOD: "Defines the Docker containerization steps and environment environment configurations to run the application in production."\n` +
-    `   - File: "src/middleware/auth.js"\n` +
-    `     * BAD: "auth.js inside src/middleware — defines the module-level logic for that layer of the application." (Generic boilerplate)\n` +
-    `     * GOOD: "Implements Express middleware to validate JSON Web Tokens (JWTs) and secure user routes."\n` +
-    `   - File: "Makefile"\n` +
-    `     * BAD: "Makefile inside the project root — defines the module-level logic for that layer of the application."\n` +
-    `     * GOOD: "Specifies shorthand command workflows to automate build tasks, database migrations, and testing scripts."\n` +
-    `\n` +
-    `   BANNED TEMPLATES & PHRASES (Your output is discarded if any match or close variation is found):\n` +
-    `   - "[filename] inside [dir] — defines the module-level logic..." (or similar variations)\n` +
-    `   - "defines the module-level logic for that layer of the application"\n` +
-    `   - "will help you trace the data flow through the codebase"\n` +
-    `   - "Configuration or resource file"\n` +
-    `   - "located inside the project root"\n` +
-    `   - "located inside the examples directory"\n` +
-    `   - "Helps you trace structural configurations and build schemas"\n` +
-    `   - "core code component", "containing logical implementations", "important source file", "key file", "this file is important", "relevant file"\n` +
-    `\n` +
-    `6. For EACH file, write TWO distinct fields:\n` +
-    `   - "explanation": ONE sentence describing what is SPECIFICALLY inside this exact file.\n` +
-    `     Describe its specific type (e.g. Express router, React context provider, Docker config, make targets, changelog documentation).\n` +
-    `   - "reason": ONE sentence explaining WHY a first-time contributor should read this file at this point in the sequence.\n` +
-    `     Describe its architectural dependency or high learning value (e.g. "Understand this first to see how request payloads are authenticated before they reach the controller endpoints").\n` +
-    `\n` +
-    `7. Output ONLY a valid JSON array. No markdown fences, no commentary, no wrapper object.\n` +
-    `   Required schema: [{ "path": "<exact path>", "explanation": "<string>", "reason": "<string>" }]`;
-
-  try {
-    // Model initialization with systemInstruction passed to getGenerativeModel
-    const model = client.getGenerativeModel({
-      model: GEMINI_MODEL,
-      systemInstruction: systemInstruction
-    });
-
-    // Only send paths — no URLs or sizes needed by the model
-    const filePaths = files.map(f => f.path);
-
-    const prompt =
-      `Repository: ${repoName}\n` +
-      `Pre-filtered source files (${filePaths.length} total — use ONLY paths from this list):\n` +
-      `${JSON.stringify(filePaths, null, 2)}\n` +
-      `\n` +
-      `Produce the reading list JSON array now. Remember: max 2 meta/docs files, all other entries must be source code files.`;
-
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json' // Force structured JSON output
-      }
-    });
-
-    const responseText = result.response.text();
-    const parsedData = JSON.parse(responseText);
-    
-    if (!Array.isArray(parsedData)) {
-      throw new Error('AI output was not in the expected array structure.');
-    }
-
-    // Post-processing: flag suspiciously similar explanations (does not modify the list)
-    warnIfDuplicateExplanations(parsedData);
+  const promise = (async () => {
+    const cacheKey = lockKey;
 
     try {
-      await setCached(cacheKey, GEMINI_MODEL, 'readOrder', parsedData);
-      console.log(`CACHED: [${cacheKey}]`);
+      const cached = await getCached(cacheKey, GEMINI_MODEL);
+      console.log('Cache lookup result:', cached ? 'HIT' : 'MISS', `[${cacheKey}]`);
+      if (cached) {
+        console.log('Returning cached read order');
+        return cached;
+      }
+      console.log(`CACHE MISS — calling Gemini`);
     } catch (err) {
-      console.error('Cache set error in generateReadingList:', err);
+      console.error('Cache get error in generateReadingList:', err);
     }
 
-    return parsedData;
-  } catch (error) {
-    console.error('Error generating AI reading list:', error);
-    return getMockReadingList(files);
+    const client = getAIClient();
+
+    if (!client) {
+      return getMockReadingList(files);
+    }
+
+    const systemInstruction =
+      `You are a senior open-source maintainer helping a brand-new contributor understand the repository "${repoName}".\n` +
+      `Your task: given a pre-filtered list of source file paths, produce an ordered JSON reading list of the 6-10 most important files to read first.\n` +
+      `\n` +
+      `STRICT RULES — violating any rule makes your output useless:\n` +
+      `\n` +
+      `1. ONLY use paths that appear verbatim in the input list. Do NOT invent or reference any path not present.\n` +
+      `\n` +
+      `2. SKIP any file that looks like tooling, config, or infrastructure even if it appears in the list:\n` +
+      `   - Anything inside a dot-directory (.agents, .github, .vscode, .husky, .cursor, .circleci, etc.)\n` +
+      `   - CI/CD config files (*.yml, *.yaml at the root level)\n` +
+      `   - Linter/formatter configs (.eslintrc, .prettierrc, .babelrc, tsconfig.json at root, etc.)\n` +
+      `   - Test fixtures, mocks, or snapshot files\n` +
+      `   - Lock files of any kind\n` +
+      `\n` +
+      `3. META-FILE CAP — in the first 5 results, at most 2 entries may be meta/documentation files.\n` +
+      `   Meta files are: CONTRIBUTING.md, DEVELOPERS.md, CODE_OF_CONDUCT.md, Makefile, LICENSE, CI config files, SECURITY.md, History.md, History,\n` +
+      `   any file whose name starts with CONTRIBUTING, DEVELOPERS, CODE_OF_CONDUCT, SECURITY, or SUPPORT.\n` +
+      `   The remaining slots in the top 5 MUST be filled with README/package.json and actual source code entry points:\n` +
+      `   package.json, index.js / index.ts, main.js, App.jsx/tsx, server.js, app.js, or files inside src/, lib/, app/, packages/.\n` +
+      `   If a large monorepo has many package subdirectories, pick one representative entry file per package, not multiple docs.\n` +
+      `\n` +
+      `4. Prioritise in this order: README → root package.json → main entry points → core routing/config → domain logic → utilities.\n` +
+      `\n` +
+      `5. UNIQUE FILE-SPECIFIC EXPLANATIONS — this is the most critical rule:\n` +
+      `   For EVERY single file, you must write explanations based on that file's REAL, SPECIFIC content and purpose. Never reuse the same sentence structure, phrasing, or wording across different files.\n` +
+      `   - SILENT CATEGORIZATION: For each file path, you MUST first silently identify the file's category (e.g. changelog/release history, license, configuration, build script, source code view, domain helper, example demo, markdown documentation) based on its extension, name, and folder location.\n` +
+      `   - Ground your explanation and reason fields entirely in that identified file category.\n` +
+      `   - If you cannot determine specific value for a file, exclude it rather than generating a generic placeholder.\n` +
+      `\n` +
+      `   INLINE EXAMPLES (Use these to guide your pattern, do not copy-paste them):\n` +
+      `   - File: "Dockerfile"\n` +
+      `     * BAD: "Dockerfile inside the project root — defines the module-level logic for that layer of the application." (Factually wrong, templated)\n` +
+      `     * GOOD: "Defines the Docker containerization steps and environment environment configurations to run the application in production."\n` +
+      `   - File: "src/middleware/auth.js"\n` +
+      `     * BAD: "auth.js inside src/middleware — defines the module-level logic for that layer of the application." (Generic boilerplate)\n` +
+      `     * GOOD: "Implements Express middleware to validate JSON Web Tokens (JWTs) and secure user routes."\n` +
+      `   - File: "Makefile"\n` +
+      `     * BAD: "Makefile inside the project root — defines the module-level logic for that layer of the application."\n` +
+      `     * GOOD: "Specifies shorthand command workflows to automate build tasks, database migrations, and testing scripts."\n` +
+      `\n` +
+      `   BANNED TEMPLATES & PHRASES (Your output is discarded if any match or close variation is found):\n` +
+      `   - "[filename] inside [dir] — defines the module-level logic..." (or similar variations)\n` +
+      `   - "defines the module-level logic for that layer of the application"\n` +
+      `   - "will help you trace the data flow through the codebase"\n` +
+      `   - "Configuration or resource file"\n` +
+      `   - "located inside the project root"\n` +
+      `   - "located inside the examples directory"\n` +
+      `   - "Helps you trace structural configurations and build schemas"\n` +
+      `   - "core code component", "containing logical implementations", "important source file", "key file", "this file is important", "relevant file"\n` +
+      `\n` +
+      `6. For EACH file, write TWO distinct fields:\n` +
+      `   - "explanation": ONE sentence describing what is SPECIFICALLY inside this exact file.\n` +
+      `     Describe its specific type (e.g. Express router, React context provider, Docker config, make targets, changelog documentation).\n` +
+      `   - "reason": ONE sentence explaining WHY a first-time contributor should read this file at this point in the sequence.\n` +
+      `     Describe its architectural dependency or high learning value (e.g. "Understand this first to see how request payloads are authenticated before they reach the controller endpoints").\n` +
+      `\n` +
+      `7. Output ONLY a valid JSON array. No markdown fences, no commentary, no wrapper object.\n` +
+      `   Required schema: [{ "path": "<exact path>", "explanation": "<string>", "reason": "<string>" }]`;
+
+    try {
+      // temperature: 0 makes the model fully deterministic — same input always gives same ranked output
+      const model = client.getGenerativeModel({
+        model: GEMINI_MODEL,
+        systemInstruction: systemInstruction,
+        generationConfig: { temperature: 0 }
+      });
+
+      // Only send paths — no URLs or sizes needed by the model
+      const filePaths = files.map(f => f.path);
+
+      const prompt =
+        `Repository: ${repoName}\n` +
+        `Pre-filtered source files (${filePaths.length} total — use ONLY paths from this list):\n` +
+        `${JSON.stringify(filePaths, null, 2)}\n` +
+        `\n` +
+        `Produce the reading list JSON array now. Remember: max 2 meta/docs files, all other entries must be source code files.`;
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json' // Force structured JSON output
+        }
+      });
+
+      const responseText = result.response.text();
+      const parsedData = JSON.parse(responseText);
+
+      if (!Array.isArray(parsedData)) {
+        throw new Error('AI output was not in the expected array structure.');
+      }
+
+      // Post-processing: flag suspiciously similar explanations (does not modify the list)
+      warnIfDuplicateExplanations(parsedData);
+
+      try {
+        await setCached(cacheKey, GEMINI_MODEL, 'readOrder', parsedData);
+        console.log(`CACHED: [${cacheKey}]`);
+      } catch (err) {
+        console.error('Cache set error in generateReadingList:', err);
+      }
+
+      return parsedData;
+    } catch (error) {
+      console.error('Error generating AI reading list:', error);
+      return getMockReadingList(files);
+    }
+  })();
+
+  inFlightRequests.set(lockKey, promise);
+  try {
+    const result = await promise;
+    return result;
+  } finally {
+    inFlightRequests.delete(lockKey);
   }
 }
 
@@ -629,25 +653,48 @@ async function generateBlockExplanation(filePath, code, simplify = false) {
   }
 
   const cacheKey = `file:${filePath}:${simplify}`;
-  try {
-    const cached = await getCached(cacheKey, GEMINI_MODEL);
-    if (cached) {
-      console.log(`CACHE HIT: [${cacheKey}]`);
-      return cached;
+
+  // In-flight deduplication: if a request for this file is already in progress, share its promise
+  if (inFlightRequests.has(cacheKey)) {
+    console.log('Waiting for in-flight request:', cacheKey);
+    return inFlightRequests.get(cacheKey);
+  }
+
+  const promise = (async () => {
+    try {
+      const cached = await getCached(cacheKey, GEMINI_MODEL);
+      console.log('Cache lookup result:', cached ? 'HIT' : 'MISS', `[${cacheKey}]`);
+      if (cached) {
+        return cached;
+      }
+      console.log(`CACHE MISS — calling Gemini`);
+    } catch (err) {
+      console.error('Cache get error in generateBlockExplanation:', err);
     }
-    console.log(`CACHE MISS — calling Gemini`);
-  } catch (err) {
-    console.error('Cache get error in generateBlockExplanation:', err);
-  }
 
-  // Real AI API call
+    // Real AI API call
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      const err = new Error("GEMINI_API_KEY environment variable is missing.");
+      console.error("Error generating AI block explanation:", err);
+      throw err;
+    }
+
+    return _runBlockExplanationAI(filePath, code, simplify, cacheKey);
+  })();
+
+  inFlightRequests.set(cacheKey, promise);
+  try {
+    const result = await promise;
+    return result;
+  } finally {
+    inFlightRequests.delete(cacheKey);
+  }
+}
+
+// Inner implementation — only called when no in-flight request exists and cache missed
+async function _runBlockExplanationAI(filePath, code, simplify, cacheKey) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    const err = new Error("GEMINI_API_KEY environment variable is missing.");
-    console.error("Error generating AI block explanation:", err);
-    throw err;
-  }
-
   try {
     const client = new GoogleGenerativeAI(apiKey);
     const category = getFileTypeCategory(filePath);
@@ -687,8 +734,18 @@ Explain it as source code:
     }
 
     const sysInstruction = simplify
-      ? `You are a patient senior developer explaining code/file contents to a beginner who is brand new to programming using basic analogies (explain like I'm 5).
-Explain the provided file in the simplest possible terms, avoiding all complex programming jargon. Use basic analogies where appropriate.
+      ? `You are a patient senior developer explaining code to someone brand new to programming using simple analogies (explain like I'm 5).
+
+GROUNDING RULES — READ CAREFULLY:
+Before writing each block's title and explanation, look up those exact line numbers in the numbered code listing provided. Base your title and explanation on what those lines LITERALLY DO — not what you expect based on the file name or surrounding context.
+
+GETTER vs SETTER RULE:
+- Code with function names like: set, attach, append, send, write, create, add, define, register, enable, disable → describe it as DOING or SETTING something.
+- Code with function names like: get, read, fetch, retrieve, check, has, is → describe it as READING or RETURNING something.
+- NEVER describe a setter as a getter or vice versa. This is the most critical accuracy rule.
+
+SELF-CHECK REQUIRED:
+After generating each block, ask: "Does my title match what lines X-Y in the numbered code actually do?" If not, rewrite it before outputting.
 
 RULES FOR GRANULARITY & BLOCK SIZING:
 1. All import/require lines must be grouped into exactly ONE block total (not one block per import).
@@ -698,25 +755,41 @@ RULES FOR GRANULARITY & BLOCK SIZING:
 5. Never cover more than 10-15 lines in a single block unless the lines are genuinely trivial (such as closing brackets, comments, blank lines).
 6. Never create blocks smaller than a single logical unit.
 
+TONE RULES:
+- Use the simplest possible words and basic real-world analogies.
+- Short sentences. One idea per sentence.
+- No jargon without an immediate simple analogy — explain it like you would to a child.
+- Never start with "This function" or "This code".
+- Max 4 sentences per block.
+- Use \n\n between distinct thoughts. Aim for 2-3 short paragraphs per block, not one blob.
+
 RULES FOR RESPONSE FORMAT:
-1. Output ONLY a valid JSON object matching the required schema. No markdown formatting (like \`\`\`json), no commentary.
+1. Output ONLY a valid JSON object matching the required schema. No markdown formatting, no commentary.
 Required JSON schema:
 {
   "summary": "One extremely simple, analogy-based sentence summarizing the overall purpose of this file.",
-  "concepts": ["Concept 1", "Concept 2", "Concept 3"], // array of 3-4 key concept tags used in this file
-  "difficulty": "Beginner", // one of "Beginner", "Intermediate", or "Advanced" based on patterns used in the file
+  "concepts": ["Concept 1", "Concept 2", "Concept 3"],
+  "difficulty": "Beginner",
   "explanation": [
     {
       "lines": "startLine-endLine",
-      "title": "5 words max, describes what this block IS",
-      "what": "one sentence only using simple analogies, explaining the behavior",
-      "why": "one sentence only, what breaks or goes wrong without this code",
-      "note": "OPTIONAL — only include when there is a noteworthy concept to explain with analogies. Omit the field entirely if nothing noteworthy."
+      "title": "5 words max — describes what the code at those lines DOES",
+      "explanation": "Simple analogy-based paragraph(s) using \\n\\n between distinct thoughts."
     }
   ]
 }`
-      : `You are a patient, beginner-friendly senior developer teaching a student who has just finished their first MERN stack tutorial.
-Explain the provided file in plain, jargon-free English by breaking it down into small, logical, contiguous line-range blocks (e.g. "1-5", "6-9", "10-14").
+      : `You are a senior developer pair-programming with a junior dev who just finished their first MERN tutorial. Your job is to explain each block of code in a natural, conversational tone — like you're sitting next to them.
+
+GROUNDING RULES — READ CAREFULLY:
+Before writing each block's title and explanation, look up those exact line numbers in the numbered code listing provided. Your title and explanation must describe what those lines LITERALLY DO — not what you expect based on the file name or surrounding context.
+
+GETTER vs SETTER RULE:
+- If the code at those lines uses function names with: set, attach, append, send, write, create, add, define, register, enable, disable, configure → describe it as DOING or SETTING something outgoing.
+- If the code uses function names with: get, read, fetch, retrieve, check, has, is → describe it as READING or RETURNING something.
+- NEVER describe a setter as a getter or vice versa. This is the most critical accuracy rule.
+
+SELF-CHECK REQUIRED:
+After generating each block, verify: "Does my title accurately match what lines X-Y in the numbered code actually do?" If not, rewrite the title and explanation before outputting.
 
 RULES FOR GRANULARITY & BLOCK SIZING:
 1. All import/require lines must be grouped into exactly ONE block total (not one block per import).
@@ -726,20 +799,27 @@ RULES FOR GRANULARITY & BLOCK SIZING:
 5. Never cover more than 10-15 lines in a single block unless the lines are genuinely trivial (such as closing brackets, comments, blank lines).
 6. Never create blocks smaller than a single logical unit.
 
+TONE RULES:
+- Write like you're talking, not documenting.
+- Short sentences. One idea per sentence.
+- No jargon without explanation — if you use a technical term, define it in the same sentence.
+- Never start with "This function" or "This code" — start with what it DOES, not what it IS.
+- Contractions are fine (it's, don't, you'll).
+- Max 4 sentences per block — if you need more, the block is too big.
+- Use \n\n between distinct thoughts. Aim for 2-3 short paragraphs per block, not one blob.
+
 RULES FOR RESPONSE FORMAT:
-1. Output ONLY a valid JSON object matching the required schema. No markdown formatting (like \`\`\`json), no commentary.
+1. Output ONLY a valid JSON object matching the required schema. No markdown formatting, no commentary.
 Required JSON schema:
 {
   "summary": "One plain-English sentence summarizing the overall purpose of this file.",
-  "concepts": ["Concept 1", "Concept 2", "Concept 3"], // array of 3-4 key concept tags used in this file
-  "difficulty": "Beginner", // one of "Beginner", "Intermediate", or "Advanced" based on patterns used in the file
+  "concepts": ["Concept 1", "Concept 2", "Concept 3"],
+  "difficulty": "Beginner",
   "explanation": [
     {
       "lines": "startLine-endLine",
-      "title": "5 words max, describes what this block IS",
-      "what": "one sentence only, plain English, no jargon, explaining the behavior",
-      "why": "one sentence only, what breaks or goes wrong without this code",
-      "note": "OPTIONAL — only include when there is a noteworthy concept to flag (like inline definitions of jargon like middleware, session, salt, hash, require, etc., security patterns, or common mistakes). Omit the field entirely if nothing noteworthy."
+      "title": "5 words max — describes what the code at those lines DOES",
+      "explanation": "Conversational paragraph(s) using \\n\\n between distinct thoughts."
     }
   ]
 }`;
@@ -749,9 +829,16 @@ Required JSON schema:
       systemInstruction: sysInstruction
     });
 
+    // Prepend line numbers so the model can anchor each block to exact lines in the code
+    const numberedCode = code.split('\n')
+      .map((line, i) => `${String(i + 1).padStart(4, ' ')} | ${line}`)
+      .join('\n');
+
     const prompt = `Explain the following code file from path: "${filePath}" using the system instructions.
+The code below is pre-numbered — line numbers appear before the | character.
+When writing a block for lines X-Y, read exactly those numbered lines and base your title and explanation ONLY on what they literally contain.
 Code:
-${code}`;
+${numberedCode}`;
 
     console.log("CALLING REAL AI");
     const result = await model.generateContent({

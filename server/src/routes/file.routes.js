@@ -3,6 +3,46 @@ const router = express.Router();
 const { fetchFileContent } = require('../services/github.service');
 const { generateBlockExplanation } = require('../services/ai.service');
 
+/**
+ * Returns a properly structured JSON error response for a caught error.
+ * Detects Gemini 429/quota errors and surfaces them with a specific status code.
+ */
+function handleRouteError(res, error, context) {
+  console.error(`File explain error [${context}]:`, error.message);
+  const isGithubLimit =
+    error.githubRateLimit ||
+    error.status === 403 ||
+    error.status === 429 ||
+    error.message?.toLowerCase().includes('rate limit') ||
+    error.message?.toLowerCase().includes('github api returned status 403') ||
+    error.message?.toLowerCase().includes('github api returned status 429');
+
+  if (isGithubLimit) {
+    return res.status(403).json({
+      error: 'GitHub rate limit exceeded',
+      message: 'Too many requests to GitHub. Add a GitHub token to increase limit to 5000/hour.',
+      retryAfter: 3600
+    });
+  }
+
+  const isQuota =
+    error.message?.includes('429') ||
+    error.message?.includes('quota') ||
+    error.message?.includes('Too Many Requests') ||
+    error.message?.toLowerCase().includes('resource has been exhausted');
+  if (isQuota) {
+    return res.status(429).json({
+      error: 'AI quota exceeded',
+      message: 'Daily AI limit reached. Please try again tomorrow or open a different file.',
+      retryAfter: 30
+    });
+  }
+  return res.status(500).json({
+    error: 'Failed to explain file',
+    message: error.message || 'An unexpected error occurred.'
+  });
+}
+
 // Map file extensions to languages for syntax highlighting compatibility
 function getLanguageFromExtension(filePath) {
   const ext = filePath.split('.').pop().toLowerCase();
@@ -65,11 +105,7 @@ router.post('/explain', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in POST /api/file/explain:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to fetch and explain the code file.'
-    });
+    return handleRouteError(res, error, 'POST /api/file/explain');
   }
 });
 
@@ -100,11 +136,7 @@ router.post('/content', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in POST /api/file/content:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to fetch the file content.'
-    });
+    return handleRouteError(res, error, 'POST /api/file/content');
   }
 });
 
@@ -141,11 +173,7 @@ router.post('/explain-only', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in POST /api/file/explain-only:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to explain the code content.'
-    });
+    return handleRouteError(res, error, 'POST /api/file/explain-only');
   }
 });
 

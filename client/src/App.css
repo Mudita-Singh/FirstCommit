@@ -1180,15 +1180,19 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   position: relative;
 }
 
-.code-viewer-loading-state,
-.code-viewer-error-state {
+/* Inline loading indicator — used inside each panel, never full-screen */
+.cv-panel-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  padding: 3rem;
+  height: 100%;
+  gap: 0.6rem;
+  color: #64748B;
+  font-family: var(--mono);
+  font-size: 0.85rem;
   text-align: center;
+  padding: 2rem;
 }
 
 .code-viewer-panel {
@@ -1201,6 +1205,12 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 
 .code-viewer-panel.left-panel {
   border-right: 1px solid #1E293B;
+  min-width: 50%;
+}
+
+/* Right panel always maintains its width */
+.code-viewer-panel:not(.left-panel) {
+  min-width: 35%;
 }
 
 .code-viewer-panel-title {
@@ -1350,4 +1360,12 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   color: #3b82f6;
   font-weight: bold;
 }
+
+/* ============================================================
+   BREADCRUMB
+   ============================================================ */
+.breadcrumb-link-hover:hover {
+  text-decoration: underline;
+}
+
 
