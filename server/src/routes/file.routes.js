@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { fetchFileContent } = require('../services/github.service');
+const path = require('path').posix;
+const { fetchFileContent, fetchRepoStructure } = require('../services/github.service');
 const { generateBlockExplanation } = require('../services/ai.service');
 
 /**
@@ -174,6 +175,110 @@ router.post('/explain-only', async (req, res) => {
     });
   } catch (error) {
     return handleRouteError(res, error, 'POST /api/file/explain-only');
+  }
+});
+
+/**
+ * Helper to search for imports/requires referencing a target file.
+ */
+function checkImport(fileContent, otherPath, targetFilePath) {
+  const otherDir = path.dirname(otherPath);
+  let relPath = path.relative(otherDir, targetFilePath);
+  if (!relPath.startsWith('.')) {
+    relPath = './' + relPath;
+  }
+  
+  // Strip extension
+  const relPathNoExt = relPath.replace(/\.(js|ts|jsx|tsx|json)$/i, '');
+  
+  const escapedRelPath = relPath.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const escapedRelPathNoExt = relPathNoExt.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  
+  const regex = new RegExp(
+    `\\b(require|import|from)\\s*\\(\\s*['"\`](${escapedRelPath}|${escapedRelPathNoExt})['"\`]\\s*\\)|` +
+    `\\b(from|import)\\s*['"\`](${escapedRelPath}|${escapedRelPathNoExt})['"\`]`,
+    'g'
+  );
+  
+  const lines = fileContent.split('\n');
+  const matches = [];
+  for (let i = 0; i < lines.length; i++) {
+    const lineContent = lines[i];
+    regex.lastIndex = 0;
+    if (regex.test(lineContent)) {
+      matches.push({
+        line: i + 1,
+        snippet: lineContent.trim()
+      });
+    }
+  }
+  return matches;
+}
+
+/**
+ * @route   POST /api/file/usages
+ * @desc    Find files that reference (import/require) the current filePath.
+ * @access  Public
+ */
+router.post('/usages', async (req, res) => {
+  const { repoOwner, repoName, filePath } = req.body;
+
+  if (!repoOwner || !repoName || !filePath) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please provide repoOwner, repoName, and filePath in the request body.'
+    });
+  }
+
+  try {
+    const rawTree = await fetchRepoStructure(repoOwner, repoName);
+    const candidateFiles = rawTree.filter(file => {
+      if (file.type !== 'blob') return false;
+      const lowerPath = file.path.toLowerCase();
+      if (file.path === filePath) return false;
+      if (lowerPath.includes('node_modules/') || 
+          lowerPath.includes('__tests__/') || 
+          lowerPath.includes('/test/') || 
+          lowerPath.startsWith('test/') ||
+          lowerPath.includes('/tests/') ||
+          lowerPath.startsWith('tests/') ||
+          lowerPath.includes('.test.') || 
+          lowerPath.includes('.spec.')) {
+        return false;
+      }
+      const ext = file.path.split('.').pop().toLowerCase();
+      return ['js', 'ts', 'jsx', 'tsx'].includes(ext);
+    });
+
+    const filesToSearch = candidateFiles.slice(0, 50);
+    const usages = [];
+
+    await Promise.all(filesToSearch.map(async (file) => {
+      try {
+        const content = await fetchFileContent(repoOwner, repoName, file.path);
+        const matches = checkImport(content, file.path, filePath);
+        matches.forEach(match => {
+          usages.push({
+            filePath: file.path,
+            line: match.line,
+            snippet: match.snippet
+          });
+        });
+      } catch (err) {
+        console.error(`Error searching usages in ${file.path}:`, err.message);
+      }
+    }));
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        usages,
+        searchedFiles: filesToSearch.length,
+        totalFound: usages.length
+      }
+    });
+  } catch (error) {
+    return handleRouteError(res, error, 'POST /api/file/usages');
   }
 });
 

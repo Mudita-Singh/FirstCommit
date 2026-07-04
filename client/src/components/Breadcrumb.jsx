@@ -2,7 +2,7 @@ import React from 'react';
 
 /**
  * Breadcrumb Component
- * Senders a top navigation path for hierarchical tracking of repos/files.
+ * Renders a top navigation path for hierarchical tracking of repos/files.
  */
 export default function Breadcrumb({ repoName, filePath, onHomeClick, onRepoClick }) {
   if (!repoName) return null;
@@ -11,10 +11,10 @@ export default function Breadcrumb({ repoName, filePath, onHomeClick, onRepoClic
     <nav className="breadcrumb-nav" style={{
       display: 'flex',
       alignItems: 'center',
-      backgroundColor: '#FFFFFF',
-      borderBottom: '1px solid #E5E7EB',
-      padding: '0.6rem 2rem',
-      fontSize: '0.82rem',
+      backgroundColor: '#0d1117',
+      borderBottom: '1px solid #30363d',
+      padding: '0.5rem 1.5rem',
+      fontSize: '0.8rem',
       width: '100%',
       boxSizing: 'border-box',
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -22,45 +22,37 @@ export default function Breadcrumb({ repoName, filePath, onHomeClick, onRepoClic
       {/* Home Link (logo part) */}
       <span 
         onClick={onHomeClick} 
+        className="breadcrumb-link"
         style={{ 
           cursor: 'pointer', 
           display: 'inline-flex', 
           alignItems: 'center', 
-          gap: '0.25rem' 
+          color: '#58a6ff',
+          fontWeight: '600'
         }}
       >
-        <span style={{ 
-          color: '#3B82F6', 
-          fontFamily: 'monospace', 
-          fontWeight: '700',
-          fontSize: '0.95rem'
-        }}>&lt;&gt;</span>
-        <span style={{ 
-          color: '#111827', 
-          fontWeight: '600',
-          textDecoration: 'none'
-        }} className="breadcrumb-link-hover">FirstCommit</span>
+        FirstCommit
       </span>
 
       {/* Separator 1 */}
-      <span style={{ color: '#9CA3AF', margin: '0 0.4rem' }}>&rsaquo;</span>
+      <span style={{ color: '#484f58', margin: '0 0.4rem' }}>&rsaquo;</span>
 
       {/* Repo Link */}
       {filePath ? (
         <span 
           onClick={onRepoClick} 
+          className="breadcrumb-link"
           style={{ 
-            color: '#3B82F6', 
+            color: '#58a6ff', 
             cursor: 'pointer',
             fontWeight: '500'
           }}
-          className="breadcrumb-link-hover"
         >
           {repoName}
         </span>
       ) : (
         <span style={{ 
-          color: '#374151', 
+          color: '#8b949e', 
           fontWeight: '500'
         }}>
           {repoName}
@@ -70,16 +62,17 @@ export default function Breadcrumb({ repoName, filePath, onHomeClick, onRepoClic
       {/* Optional File path link */}
       {filePath && (
         <>
-          <span style={{ color: '#9CA3AF', margin: '0 0.4rem' }}>&rsaquo;</span>
+          <span style={{ color: '#484f58', margin: '0 0.4rem' }}>&rsaquo;</span>
           <span 
             title={filePath}
             style={{ 
-              color: '#374151', 
-              fontWeight: '500',
+              color: '#8b949e', 
+              fontWeight: '400',
+              fontFamily: 'Menlo, Monaco, Consolas, monospace',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              maxWidth: '300px'
+              maxWidth: '250px'
             }}
           >
             {filePath}

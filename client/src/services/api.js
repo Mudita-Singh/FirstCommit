@@ -161,5 +161,29 @@ export const explainFileWithBlocksOnly = async (filePath, rawContent, simplify =
   }
 };
 
+/**
+ * Find all import/require usages of a file in the repository.
+ */
+export const fetchFileUsages = async (repoOwner, repoName, filePath) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/file/usages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ repoOwner, repoName, filePath }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || `Server returned error status: ${response.status}`);
+    }
+    return result;
+  } catch (error) {
+    console.error('Failed to fetch file usages:', error);
+    throw error;
+  }
+};
+
+
 
 
