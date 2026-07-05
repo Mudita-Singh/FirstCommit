@@ -140,11 +140,18 @@ async function analyzeIssue(owner, repo, issue, fileTree) {
 
   const fallback = {
     summary: `This issue is about: "${issue.title}". Read the full description on GitHub for details.`,
+    whyItMatters: 'Understanding this issue helps keep the application robust and error-free.',
+    startHere: [
+      { step: 1, action: 'Open relevant files', detail: 'Locate and check files mentioned below.' }
+    ],
     filesToTouch: [],
     filesToIgnore: ['node_modules/', 'build/', 'dist/'],
-    estimatedEffort: 'Check the GitHub issue for scope details',
+    estimatedMinutes: '15-20',
     difficulty: estimateDifficultyFromText(issue.title, issue.body || ''),
     difficultyReason: 'Estimated from issue title',
+    difficultyScore: 2,
+    testsNeeded: false,
+    totalLinesOfCode: 0,
     firstStep: 'Read the issue on GitHub carefully, then search the codebase for relevant files mentioned in the description.'
   };
 
@@ -159,42 +166,52 @@ async function analyzeIssue(owner, repo, issue, fileTree) {
       model: GEMINI_MODEL
     });
 
-    const prompt = `You are helping a first-time open source contributor understand which files to change to fix a GitHub issue.
+    const prompt = `You are helping a first-time open source contributor fix a GitHub issue. Be specific and actionable.
 
 Repository: ${owner}/${repo}
 Issue #${issue.number}: ${issue.title}
-
-Issue description:
-${issue.body || 'No description provided'}
+${issue.body ? `Description:\n${issue.body}` : 'No description provided — analyze from title only.'}
 
 Repository files:
-${(fileTree || []).slice(0, 150).join('\n')}
+${fileTree.slice(0, 150).join('\n')}
 
-Respond ONLY with a valid JSON object. No markdown, no backticks, no explanation. Just the JSON:
+Respond ONLY with valid JSON. No markdown, no backticks:
 {
-  'summary': 'one clear sentence explaining what needs to change and why',
+  'summary': 'one clear sentence: what needs to change and why',
+  'whyItMatters': 'one sentence: why this bug/feature matters, what goes wrong without the fix',
+  'startHere': [
+    {
+      'step': 1,
+      'action': 'short action title (max 5 words)',
+      'detail': 'one sentence explaining this step'
+    }
+  ],
   'filesToTouch': [
     {
       'path': 'exact/file/path.js',
-      'lines': '12-40',
-      'reason': 'one sentence why this file needs changing',
-      'codeSnippet': 'the exact relevant lines from this file that relate to the issue — copy them exactly as they appear, max 8 lines'
+      'lines': '104-123',
+      'lineCount': 20,
+      'reason': 'one sentence why this file',
+      'confidence': 95,
+      'codeSnippet': 'actual relevant code lines — max 8 lines, only if confident about exact location, empty string if unsure'
     }
   ],
   'filesToIgnore': ['tests/', 'build/', 'node_modules/'],
-  'estimatedEffort': 'one sentence about scope',
+  'estimatedMinutes': '20-30',
   'difficulty': 'Easy or Medium or Hard',
-  'difficultyReason': 'one sentence explaining rating',
-  'firstStep': 'one specific sentence — exactly where to start and what to look at first'
+  'difficultyReason': 'one sentence',
+  'difficultyScore': 2,
+  'testsNeeded': true or false,
+  'totalLinesOfCode': 20
 }
 
 Rules:
-- filesToTouch: max 5 files, most important first
-- filesToIgnore: folder patterns only, not full paths
-- difficulty must be exactly Easy, Medium, or Hard
-- codeSnippet: only include if you are confident about the exact lines — if unsure, return empty string ''
-- Base analysis only on files that exist in the repository files list provided above
-- If issue body is empty, analyze from title only`;
+- startHere: 3-5 concrete steps a beginner follows in order. Step 1 always opens a specific file. Last step always runs tests or verifies the fix.
+- filesToTouch: max 5, sorted by confidence descending. confidence is 0-100 integer.
+- estimatedMinutes: realistic estimate like '15-20', '30-45', '1-2 hours'. Be honest — don't underestimate.
+- difficultyScore: 1=very easy, 2=easy, 3=medium, 4=hard, 5=very hard. Used for dot rating display.
+- totalLinesOfCode: sum of all filesToTouch lineCount values.
+- If issue body is empty, base everything on title only. Lower confidence scores, fewer files, vaguer steps.`;
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -206,15 +223,26 @@ Rules:
 
     const responseText = result.response.text();
     
-    // Strip markdown code blocks if present
     let rawText = responseText;
+
+    // Remove ALL possible markdown wrappers
     rawText = rawText
-      .replace(/^```json\n?/, '')
-      .replace(/^```\n?/, '')
-      .replace(/\n?```$/, '')
+      .replace(/^[\s\S]*?```(?:json)?\s*/i, '')
+      .replace(/\s*```[\s\S]*$/i, '')
       .trim();
 
-    const parsedData = JSON.parse(rawText);
+    // If still not starting with {, find the JSON
+    if (!rawText.startsWith('{')) {
+      const match = rawText.match(/\{[\s\S]*\}/)
+      if (match) rawText = match[0]
+    }
+
+    console.log('=== RAW GEMINI RESPONSE ===')
+    console.log(rawText)
+    console.log('=== END RESPONSE ===')
+
+    const analysis = JSON.parse(rawText)
+    const parsedData = analysis;
 
     if (typeof parsedData !== 'object' || parsedData === null) {
       throw new Error('AI output was not in the expected object structure.');
@@ -222,12 +250,19 @@ Rules:
 
     return {
       summary: parsedData.summary || parsedData.Summary || '',
-      filesToTouch: Array.isArray(parsedData.filesToTouch) ? parsedData.filesToTouch : (Array.isArray(parsedData.FilesToTouch) ? parsedData.FilesToTouch : []),
+      whyItMatters: parsedData.whyItMatters || parsedData.WhyItMatters || '',
+      startHere: Array.isArray(parsedData.startHere) ? parsedData.startHere : [],
+      filesToTouch: Array.isArray(parsedData.filesToTouch) ? parsedData.filesToTouch.map(f => ({
+        ...f,
+        lineCount: typeof f.lineCount === 'number' ? f.lineCount : parseInt(f.lineCount || 0)
+      })) : [],
       filesToIgnore: Array.isArray(parsedData.filesToIgnore) ? parsedData.filesToIgnore : (Array.isArray(parsedData.FilesToIgnore) ? parsedData.FilesToIgnore : ['node_modules/', 'build/', 'dist/']),
-      estimatedEffort: parsedData.estimatedEffort || parsedData.EstimatedEffort || '',
+      estimatedMinutes: parsedData.estimatedMinutes || parsedData.EstimatedMinutes || '20-30',
       difficulty: parsedData.difficulty || parsedData.Difficulty || 'Unknown',
       difficultyReason: parsedData.difficultyReason || parsedData.DifficultyReason || '',
-      firstStep: parsedData.firstStep || parsedData.FirstStep || ''
+      difficultyScore: typeof parsedData.difficultyScore === 'number' ? parsedData.difficultyScore : 2,
+      testsNeeded: parsedData.testsNeeded === true || parsedData.testsNeeded === 'true',
+      totalLinesOfCode: typeof parsedData.totalLinesOfCode === 'number' ? parsedData.totalLinesOfCode : 0
     };
   } catch (error) {
     console.error('Error analyzing issue with Gemini:', error);

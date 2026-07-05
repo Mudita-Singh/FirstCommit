@@ -17,7 +17,14 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(209,213,219,0.45) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--text);
+  font-family: var(--font);
+}
 h1, h2, h3, p { margin: 0; }
 button { font-family: var(--font); cursor: pointer; border: none; background: none; }
 
@@ -26,19 +33,9 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
    ============================================================ */
 .home-page {
   min-height: 100vh;
-  background-color: var(--bg);
-  background-image: radial-gradient(rgba(209,213,219,0.45) 1px, transparent 1px);
-  background-size: 22px 22px;
   display: flex;
   flex-direction: column;
   align-items: stretch; /* children fill full width */
-}
-
-.workspace-page {
-  min-height: 100vh;
-  background-color: var(--bg);
-  background-image: radial-gradient(rgba(209,213,219,0.45) 1px, transparent 1px);
-  background-size: 22px 22px;
 }
 
 
@@ -242,6 +239,9 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   gap: 0.55rem;
   min-width: 0;
   padding: 0 0.5rem;
+  width: 160px;
+  max-width: 160px;
+  text-align: center;
 }
 
 /* Pastel circle icon */
@@ -409,7 +409,6 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
    ============================================================ */
 .workspace-page {
   min-height: 100vh;
-  background: #FAFAFA;
   color: #111827;
   font-family: var(--font);
   display: flex;
@@ -427,7 +426,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   width: 100%;
   display: flex;
   align-items: center;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   box-sizing: border-box;
 }
 
@@ -451,19 +450,23 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   height: 64px;
 }
 
-/* Purple header styling when split view editor is active */
+/* Dark header styling when split view editor is active (CodeViewer open) */
 .workspace-page.has-active-file .site-header-shared.is-workspace {
-  background: #EDE9FE;
-  border-bottom: 1px solid #DBCDFB;
-  box-shadow: 0 1px 3px 0 rgba(124, 58, 237, 0.1);
+  background: #0d1117;
+  border-bottom: 1px solid #30363d;
+  box-shadow: none;
 }
 
 .workspace-page.has-active-file .site-header-shared.is-workspace .logo-svg {
-  color: #7C3AED;
+  color: #3b82f6;
+}
+
+.workspace-page.has-active-file .site-header-shared.is-workspace .logo-text {
+  color: #ffffff;
 }
 
 .workspace-page.has-active-file .site-header-shared.is-workspace .header-logo-btn:hover .logo-text {
-  color: #6D28D9;
+  color: #ffffff;
 }
 
 .site-header-shared .navbar-container {
@@ -483,6 +486,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 
 .logo-svg {
   color: #3B82F6;
+  transition: color 0.15s ease;
 }
 
 .logo-text {
@@ -490,6 +494,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   font-size: 1.05rem;
   font-weight: 700;
   color: #111827;
+  transition: color 0.15s ease;
 }
 
 .site-header-shared.is-workspace .header-logo-btn:hover .logo-text {
@@ -1118,7 +1123,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   display: flex;
   flex-direction: column;
   height: calc(100vh - 57px);
-  background: #0C0D12;
+  background: #0d1117;
   color: #E2E8F0;
   animation: fadeUp 0.25s ease;
   font-family: var(--font);

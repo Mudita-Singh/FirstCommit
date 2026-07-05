@@ -13,6 +13,7 @@ function App() {
   const [repoUrl, setRepoUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState(null);
+  const [loadingDemo, setLoadingDemo] = useState(null);
   const [error, setError] = useState(null);
 
   // Split-view states
@@ -27,6 +28,7 @@ function App() {
   // Ref to track latest analysisData in popstate closure
   const analysisDataRef = useRef(analysisData);
   const readOrderScrollPos = useRef(0);
+  const tabBarRef = useRef(null);
   useEffect(() => {
     analysisDataRef.current = analysisData;
   }, [analysisData]);
@@ -55,10 +57,14 @@ function App() {
   }, []);
 
   // ── Core analysis function ─────────────────────────────────────────────────
-  const analyzeUrl = useCallback(async (targetUrl) => {
+  const analyzeUrl = useCallback(async (targetUrl, demoName = null) => {
     if (!targetUrl.trim()) return;
 
-    setIsLoading(true);
+    if (demoName) {
+      setLoadingDemo(demoName);
+    } else {
+      setIsLoading(true);
+    }
     setError(null);
     setAnalysisData(null);
     setSelectedFile(null);
@@ -84,6 +90,7 @@ function App() {
       setError(err.message || 'An unexpected error occurred. Is the server running?');
     } finally {
       setIsLoading(false);
+      setLoadingDemo(null);
     }
   }, []);
 
@@ -94,7 +101,7 @@ function App() {
 
   const handleRepoCardClick = (repoPath) => {
     setRepoUrl(`https://github.com/${repoPath}`);
-    analyzeUrl(repoPath);
+    analyzeUrl(repoPath, repoPath);
   };
 
   const handleRescan = () => {
@@ -235,7 +242,6 @@ function App() {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleScrollSync = (source) => {
@@ -353,6 +359,29 @@ function App() {
     if (ext === 'ts' || ext === 'tsx') return '#3B82F6';
     if (ext === 'css') return '#7C3AED';
     return '#6B7280';
+  };
+
+  const getTechBadgeStyle = (techName) => {
+    const name = techName.toLowerCase();
+    if (name.includes('javascript') || name === 'js') {
+      return { backgroundColor: '#FEF9C3', color: '#854D0E', border: '1px solid #FEF08A' };
+    }
+    if (name.includes('typescript') || name === 'ts') {
+      return { backgroundColor: '#E0F2FE', color: '#0369A1', border: '1px solid #BAE6FD' };
+    }
+    if (name.includes('html')) {
+      return { backgroundColor: '#FFEDD5', color: '#9A3412', border: '1px solid #FED7AA' };
+    }
+    if (name.includes('css')) {
+      return { backgroundColor: '#E0F2FE', color: '#0369A1', border: '1px solid #BAE6FD' };
+    }
+    if (name.includes('node') || name.includes('express')) {
+      return { backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #BBF7D0' };
+    }
+    if (name.includes('ejs') || name.includes('react') || name.includes('vue') || name.includes('redux')) {
+      return { backgroundColor: '#F3E8FF', color: '#6B21A8', border: '1px solid #E9D5FF' };
+    }
+    return { backgroundColor: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' };
   };
 
   const getTechLogo = (name) => {
@@ -511,12 +540,12 @@ function App() {
                   placeholder="e.g., https://github.com/expressjs/express"
                   value={repoUrl}
                   onChange={e => setRepoUrl(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || loadingDemo !== null}
                 />
                 <button
                   type="submit"
                   className="search-btn"
-                  disabled={isLoading}
+                  disabled={isLoading || loadingDemo !== null}
                 >
                   Analyze →
                 </button>
@@ -635,50 +664,95 @@ function App() {
 
               <div className="try-cards">
                 {/* Card 1 */}
-                <button
-                  className="repo-card"
-                  onClick={() => handleRepoCardClick('expressjs/express')}
-                  disabled={isLoading}
-                >
-                  <div className="repo-card-left">
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
-                      <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-                    </svg>
-                    <div className="repo-card-info">
-                      <span className="repo-card-name">expressjs/express</span>
-                      <span className="repo-card-desc">Fast, unopinionated, minimalist web framework for Node.js.</span>
+                {/* Card 1 */}
+                {loadingDemo === 'expressjs/express' ? (
+                  <button
+                    className="repo-card"
+                    style={{
+                      border: '1px solid #BFDBFE',
+                      backgroundColor: 'white',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      cursor: 'default',
+                      gap: '0.5rem'
+                    }}
+                    disabled={true}
+                  >
+                    <div className="spin-logo" style={{ fontSize: '32px' }}>&lt;&gt;</div>
+                    <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500' }}>
+                      Analyzing expressjs/express...
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    className="repo-card"
+                    onClick={() => handleRepoCardClick('expressjs/express')}
+                    disabled={isLoading || loadingDemo === 'expressjs/express'}
+                  >
+                    <div className="repo-card-left">
+                      <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
+                        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                      </svg>
+                      <div className="repo-card-info">
+                        <span className="repo-card-name">expressjs/express</span>
+                        <span className="repo-card-desc">Fast, unopinionated, minimalist web framework for Node.js.</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="repo-card-arrow">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                      <polyline points="12 5 19 12 12 19"/>
-                    </svg>
-                  </div>
-                </button>
+                    <div className="repo-card-arrow">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </div>
+                  </button>
+                )}
 
                 {/* Card 2 */}
-                <button
-                  className="repo-card"
-                  onClick={() => handleRepoCardClick('excalidraw/excalidraw')}
-                  disabled={isLoading}
-                >
-                  <div className="repo-card-left">
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
-                      <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-                    </svg>
-                    <div className="repo-card-info">
-                      <span className="repo-card-name">excalidraw/excalidraw</span>
-                      <span className="repo-card-desc">Virtual whiteboard for sketching hand-drawn like diagrams.</span>
+                {loadingDemo === 'excalidraw/excalidraw' ? (
+                  <button
+                    className="repo-card"
+                    style={{
+                      border: '1px solid #BFDBFE',
+                      backgroundColor: 'white',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      cursor: 'default',
+                      gap: '0.5rem'
+                    }}
+                    disabled={true}
+                  >
+                    <div className="spin-logo" style={{ fontSize: '32px' }}>&lt;&gt;</div>
+                    <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500' }}>
+                      Analyzing excalidraw/excalidraw...
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    className="repo-card"
+                    onClick={() => handleRepoCardClick('excalidraw/excalidraw')}
+                    disabled={isLoading || loadingDemo === 'excalidraw/excalidraw'}
+                  >
+                    <div className="repo-card-left">
+                      <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
+                        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                      </svg>
+                      <div className="repo-card-info">
+                        <span className="repo-card-name">excalidraw/excalidraw</span>
+                        <span className="repo-card-desc">Virtual whiteboard for sketching hand-drawn like diagrams.</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="repo-card-arrow">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                      <polyline points="12 5 19 12 12 19"/>
-                    </svg>
-                  </div>
-                </button>
+                    <div className="repo-card-arrow">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </div>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -711,73 +785,121 @@ function App() {
               {/* Left: avatar + info */}
               <div className="ws-header-left">
                 <div className="ws-repo-avatar-wrap">
-                  <div className="ws-repo-avatar">
+                  <div className="ws-repo-avatar" style={{ textTransform: 'lowercase' }}>
                     {analysisData?.repo ? analysisData.repo.slice(0, 2).toLowerCase() : 'fc'}
                   </div>
                   <span className="ws-avatar-dot"></span>
                 </div>
                 <div className="ws-repo-info">
-                  <h2 className="ws-repo-name">
+                  <h2 className="ws-repo-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
                     <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" className="ws-repo-link">
                       {analysisData?.owner}/{analysisData?.repo}
                     </a>
-                    <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" className="ws-external-btn" aria-label="Open on GitHub">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', color: '#4F46E5', transition: 'color 0.15s ease' }} aria-label="Open on GitHub">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                   </h2>
-                  {repoDescription && <p className="ws-repo-desc">{repoDescription}</p>}
+                  {repoDescription && <p className="ws-repo-desc" style={{ margin: '0.2rem 0 0.5rem 0' }}>{repoDescription}</p>}
 
-                  {/* Stat boxes */}
-                  <div className="ws-stat-boxes">
-                    {analysisData?.stars && (
-                      <div className="ws-stat-box">
-                        <div className="ws-stat-top">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                          <span className="ws-stat-value">{formatStars(analysisData.stars)}</span>
-                        </div>
-                        <span className="ws-stat-label">Stars</span>
-                      </div>
-                    )}
-                    {analysisData?.language && (
-                      <div className="ws-stat-box">
-                        <div className="ws-stat-top">
-                          <span className="ws-lang-badge">JS</span>
-                          <span className="ws-stat-value">{analysisData.language}</span>
-                        </div>
-                        <span className="ws-stat-label">Primary language</span>
-                      </div>
-                    )}
-                    {analysisData?.filesCount && (
-                      <div className="ws-stat-box">
-                        <div className="ws-stat-top">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                          <span className="ws-stat-value">{analysisData.filesCount}</span>
-                        </div>
-                        <span className="ws-stat-label">Files</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tech Stack */}
-                  {techStack.length >= 2 && (
-                    <div className="ws-header-tech-stack">
-                      <div className="ws-tech-stack-heading">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
-                        <span className="ws-tech-stack-label">TECH STACK</span>
-                      </div>
-                      <div className="ws-tech-stack-pills">
-                        {techStack.slice(0, 4).map(t => (
-                          <span key={t} className="ws-tech-pill">
+                  {/* Language Badges Pills */}
+                  {techStack.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                      {techStack.slice(0, 5).map(t => {
+                        const badgeStyle = getTechBadgeStyle(t);
+                        return (
+                          <span key={t} className="ws-tech-pill" style={{
+                            ...badgeStyle,
+                            borderRadius: '9999px',
+                            padding: '0.25rem 0.75rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}>
                             {getTechLogo(t)}
                             {t}
                           </span>
-                        ))}
-                        {techStack.length > 4 && (
-                          <span className="ws-tech-pill ws-tech-more">+{techStack.length - 4} more</span>
-                        )}
-                      </div>
+                        );
+                      })}
+                      {techStack.length > 5 && (
+                        <span className="ws-tech-pill ws-tech-more" style={{ borderRadius: '9999px', padding: '0.25rem 0.75rem', fontSize: '0.75rem', fontWeight: '600' }}>
+                          +{techStack.length - 5} more
+                        </span>
+                      )}
                     </div>
                   )}
+
+                  {/* Unified Stats Card */}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '12px',
+                    padding: '0.6rem 1.25rem',
+                    gap: '1.25rem',
+                    boxShadow: '0 1px 2px 0 rgba(0,0,0,0.02)'
+                  }}>
+                    {/* Stars */}
+                    {analysisData?.stars && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: '#EEF2FF',
+                          color: '#6366F1',
+                          flexShrink: 0
+                        }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                          </svg>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                          <span style={{ fontSize: '1rem', fontWeight: '800', color: '#111827' }}>
+                            {formatStars(analysisData.stars)}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: '500', marginTop: '0.1rem' }}>Stars</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Divider */}
+                    {analysisData?.stars && analysisData?.filesCount && (
+                      <div style={{ width: '1px', height: '24px', backgroundColor: '#E5E7EB' }}></div>
+                    )}
+
+                    {/* Files */}
+                    {analysisData?.filesCount && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: '#EEF2FF',
+                          color: '#6366F1',
+                          flexShrink: 0
+                        }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                          </svg>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                          <span style={{ fontSize: '1rem', fontWeight: '800', color: '#111827' }}>
+                            {analysisData.filesCount}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: '500', marginTop: '0.1rem' }}>Files</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -789,13 +911,17 @@ function App() {
                   {/* Browser window */}
                   <rect x="55" y="10" width="120" height="88" rx="10" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="1.5"/>
                   {/* Titlebar */}
-                  <rect x="55" y="10" width="120" height="24" rx="10" fill="#1E293B"/>
-                  <rect x="55" y="22" width="120" height="12" fill="#1E293B"/>
+                  <rect x="55" y="10" width="120" height="24" rx="10" fill="#8B5CF6"/>
+                  <rect x="55" y="22" width="120" height="12" fill="#8B5CF6"/>
                   <circle cx="68" cy="22" r="3.5" fill="#EF4444"/>
                   <circle cx="79" cy="22" r="3.5" fill="#F59E0B"/>
                   <circle cx="90" cy="22" r="3.5" fill="#10B981"/>
                   {/* Code symbol */}
-                  <text x="115" y="68" fill="#3B82F6" fontFamily="monospace" fontSize="28" fontWeight="800" textAnchor="middle">&lt;/&gt;</text>
+                  <text x="115" y="68" fill="#6366F1" fontFamily="monospace" fontSize="28" fontWeight="800" textAnchor="middle">&lt;/&gt;</text>
+                  {/* Sparkle star 1 */}
+                  <path d="M190 40a4 4 0 0 0-4-4 4 4 0 0 0 4-4 4 4 0 0 0 4 4 4 4 0 0 0-4 4z" fill="#A78BFA"/>
+                  {/* Sparkle star 2 */}
+                  <path d="M165 105a3 3 0 0 0-3-3 3 3 0 0 0 3-3 3 3 0 0 0 3 3 3 3 0 0 0-3 3z" fill="#A78BFA"/>
                   {/* Lines */}
                   <rect x="75" y="80" width="50" height="3" rx="1.5" fill="#E2E8F0"/>
                   <rect x="75" y="87" width="70" height="3" rx="1.5" fill="#E2E8F0"/>
@@ -811,7 +937,7 @@ function App() {
 
             {/* Read Order Heading Row */}
             {/* Tab Bar */}
-            <div className="ws-tabs-new">
+            <div ref={tabBarRef} className="ws-tabs-new">
               <div className="ws-tabs-title-row" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                 {/* Read Order Tab */}
                 <div 
@@ -898,10 +1024,30 @@ function App() {
                   {analysisData.readingList.map((file, i) => {
                     const cat = getCategoryTag(file.path);
                     const theme = getButtonTheme(file.path);
-                    const dotColor = getDotColor(file.path);
                     return (
                       <div key={file.path} className="ws-timeline-item">
-                        <div className="ws-timeline-dot" style={{ backgroundColor: dotColor }}></div>
+                        <div style={{
+                          position: 'absolute',
+                          left: '-3rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: '30px',
+                          height: '30px',
+                          borderRadius: '50%',
+                          backgroundColor: '#3B82F6',
+                          color: 'white',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          border: '2px solid white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 2,
+                          boxShadow: '0 0 0 1px #BFDBFE',
+                          fontFamily: 'var(--font)'
+                        }}>
+                          {i + 1}
+                        </div>
                         <div className="ws-item-timeline-card">
                           {getFileIconLayout(file.path)}
                           <div className="ws-item-info">
@@ -933,6 +1079,7 @@ function App() {
                 repo={analysisData.repo}
                 fileTree={analysisData.files.map(f => f.path)}
                 onFileOpen={handleReadFile}
+                tabBarRef={tabBarRef}
               />
             )}
           </div>

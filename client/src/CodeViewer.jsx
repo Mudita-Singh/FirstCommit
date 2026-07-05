@@ -102,7 +102,43 @@ function UsagesPanel({ repoOwner, repoName, filePath, onFileClick }) {
         fontSize: '0.875rem',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🔍</div>
+        <div style={{ position: 'relative', width: '48px', height: '48px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg 
+            width="40" 
+            height="40" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="#30363d" 
+            strokeWidth="1.5" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <svg 
+            width="20" 
+            height="20" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="#58a6ff" 
+            strokeWidth="2.5" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            style={{
+              position: 'absolute',
+              bottom: '0px',
+              right: '0px',
+              background: '#0d1117',
+              borderRadius: '50%',
+              padding: '2px',
+              boxShadow: '0 0 0 2px #0d1117'
+            }}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </div>
         No imports found in this repo's source files
       </div>
     );
