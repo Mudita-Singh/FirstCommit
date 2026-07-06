@@ -20,6 +20,9 @@ if (process.env.MONGODB_URI) {
 
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const { router: authRouter, passport } = require('./routes/auth.routes');
 
 // Initialize the Express application
 const app = express();
@@ -29,7 +32,24 @@ const PORT = process.env.PORT || 5000;
 
 // Enable Cross-Origin Resource Sharing (CORS)
 // This permits our frontend (on another port) to send requests to this server
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? 'https://your-vercel-url.vercel.app'
+    : 'http://localhost:5173',
+  credentials: true  // ← THIS IS CRITICAL for cookies
+}));
+
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.JWT_SECRET || 'firstcommit-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production' 
+  }
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Enable JSON middleware to parse incoming JSON request bodies (10mb for large file contents)
 app.use(express.json({ limit: '10mb' }));
@@ -46,6 +66,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/repo', repoRouter);
 app.use('/api/file', fileRouter);
 app.use('/api/issues', issueRouter);
+app.use('/api/auth', authRouter);
 
 // Start listening for incoming network requests
 app.listen(PORT, () => {

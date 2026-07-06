@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchHealth, analyzeRepository, fetchFileExplanation, fetchRawFileContent } from './services/api';
+import { getMe, logout, saveRepo } from './services/authApi';
 import CodeViewer from './CodeViewer';
 import Navbar from './Navbar';
 import Breadcrumb from './components/Breadcrumb';
@@ -10,6 +11,8 @@ import './App.css';
 // Called by: Analyze button, repo chips, demo cards — all paths funnel here.
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [repoUrl, setRepoUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState(null);
@@ -24,6 +27,41 @@ function App() {
   const [techStack, setTechStack] = useState([]);
   const [repoDescription, setRepoDescription] = useState('');
   const [activeTab, setActiveTab] = useState('readOrder');
+
+  useEffect(() => {
+    getMe()
+      .then(data => {
+        setUser(data?.user || null);
+      })
+      .catch(() => setUser(null))
+      .finally(() => setAuthLoading(false));
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+  };
+
+  const handleSaveRepo = async () => {
+    if (!user) {
+      window.location.href = 'http://localhost:5000/api/auth/github';
+      return;
+    }
+    const result = await saveRepo({
+      owner: analysisData.owner,
+      repo: analysisData.repo,
+      fullName: analysisData.fullName,
+      description: repoDescription || '',
+      language: techStack?.[0] || '',
+      stars: analysisData.stars || 0
+    });
+    if (result.saved) {
+      setUser(prev => ({
+        ...prev,
+        savedRepos: result.savedRepos
+      }));
+    }
+  };
 
   // Ref to track latest analysisData in popstate closure
   const analysisDataRef = useRef(analysisData);
@@ -512,7 +550,7 @@ function App() {
       {/* ── HOMEPAGE ─────────────────────────────────────────────────────── */}
       {isHome && (
         <>
-          <Navbar isHome={true} />
+          <Navbar isHome={true} user={user} authLoading={authLoading} onLogout={handleLogout} />
 
           <main className="home-main">
 
@@ -657,103 +695,160 @@ function App() {
           </main>
 
           {/* ── TRY FIRSTCOMMIT — direct child of home-page so it can be truly full-width ── */}
+          {/* ── TRY FIRSTCOMMIT — direct child of home-page so it can be truly full-width ── */}
           <section className="try-section">
             <div className="try-inner">
-              <h2 className="try-title">Try FirstCommit</h2>
-              <p className="try-subtitle">Click a repository to explore it with FirstCommit.</p>
+              {user && Array.isArray(user.savedRepos) && user.savedRepos.length > 0 ? (
+                <>
+                  <h2 className="try-title">Your Repositories</h2>
+                  <p className="try-subtitle">Repos you've analyzed before</p>
 
-              <div className="try-cards">
-                {/* Card 1 */}
-                {/* Card 1 */}
-                {loadingDemo === 'expressjs/express' ? (
-                  <button
-                    className="repo-card"
-                    style={{
-                      border: '1px solid #BFDBFE',
-                      backgroundColor: 'white',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      cursor: 'default',
-                      gap: '0.5rem'
-                    }}
-                    disabled={true}
-                  >
-                    <div className="spin-logo" style={{ fontSize: '32px' }}>&lt;&gt;</div>
-                    <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500' }}>
-                      Analyzing expressjs/express...
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    className="repo-card"
-                    onClick={() => handleRepoCardClick('expressjs/express')}
-                    disabled={isLoading || loadingDemo === 'expressjs/express'}
-                  >
-                    <div className="repo-card-left">
-                      <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
-                        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-                      </svg>
-                      <div className="repo-card-info">
-                        <span className="repo-card-name">expressjs/express</span>
-                        <span className="repo-card-desc">Fast, unopinionated, minimalist web framework for Node.js.</span>
-                      </div>
-                    </div>
-                    <div className="repo-card-arrow">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                        <polyline points="12 5 19 12 12 19"/>
-                      </svg>
-                    </div>
-                  </button>
-                )}
+                  <div className="try-cards">
+                    {user.savedRepos.map((repoItem, idx) => (
+                      <button
+                        key={repoItem._id || idx}
+                        className="repo-card"
+                        onClick={() => handleRepoCardClick(repoItem.fullName)}
+                        disabled={isLoading || loadingDemo !== null}
+                      >
+                        <div className="repo-card-left">
+                          <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
+                            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                          </svg>
+                          <div className="repo-card-info">
+                            <span className="repo-card-name">{repoItem.fullName}</span>
+                            <span className="repo-card-desc">{repoItem.description || 'No description provided.'}</span>
+                            {repoItem.language && (
+                              <span style={{
+                                display: 'inline-block',
+                                fontSize: '0.72rem',
+                                color: '#4F46E5',
+                                backgroundColor: '#EEF2FF',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '9999px',
+                                marginTop: '0.25rem',
+                                alignSelf: 'flex-start',
+                                fontWeight: '600'
+                              }}>
+                                {repoItem.language}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="repo-card-arrow">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                          </svg>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="try-title">Try FirstCommit</h2>
+                  <p className="try-subtitle">Click a repository to explore it with FirstCommit.</p>
 
-                {/* Card 2 */}
-                {loadingDemo === 'excalidraw/excalidraw' ? (
-                  <button
-                    className="repo-card"
-                    style={{
-                      border: '1px solid #BFDBFE',
-                      backgroundColor: 'white',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      cursor: 'default',
-                      gap: '0.5rem'
-                    }}
-                    disabled={true}
-                  >
-                    <div className="spin-logo" style={{ fontSize: '32px' }}>&lt;&gt;</div>
-                    <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500' }}>
-                      Analyzing excalidraw/excalidraw...
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    className="repo-card"
-                    onClick={() => handleRepoCardClick('excalidraw/excalidraw')}
-                    disabled={isLoading || loadingDemo === 'excalidraw/excalidraw'}
-                  >
-                    <div className="repo-card-left">
-                      <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
-                        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-                      </svg>
-                      <div className="repo-card-info">
-                        <span className="repo-card-name">excalidraw/excalidraw</span>
-                        <span className="repo-card-desc">Virtual whiteboard for sketching hand-drawn like diagrams.</span>
-                      </div>
+                  <div className="try-cards">
+                    {/* Card 1 */}
+                    {loadingDemo === 'expressjs/express' ? (
+                      <button
+                        className="repo-card"
+                        style={{
+                          border: '1px solid #BFDBFE',
+                          backgroundColor: 'white',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          cursor: 'default',
+                          gap: '0.5rem'
+                        }}
+                        disabled={true}
+                      >
+                        <div className="spin-logo" style={{ fontSize: '32px' }}>&lt;&gt;</div>
+                        <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500' }}>
+                          Analyzing expressjs/express...
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        className="repo-card"
+                        onClick={() => handleRepoCardClick('expressjs/express')}
+                        disabled={isLoading || loadingDemo === 'expressjs/express'}
+                      >
+                        <div className="repo-card-left">
+                          <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
+                            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                          </svg>
+                          <div className="repo-card-info">
+                            <span className="repo-card-name">expressjs/express</span>
+                            <span className="repo-card-desc">Fast, unopinionated, minimalist web framework for Node.js.</span>
+                          </div>
+                        </div>
+                        <div className="repo-card-arrow">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Card 2 */}
+                    {loadingDemo === 'excalidraw/excalidraw' ? (
+                      <button
+                        className="repo-card"
+                        style={{
+                          border: '1px solid #BFDBFE',
+                          backgroundColor: 'white',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          cursor: 'default',
+                          gap: '0.5rem'
+                        }}
+                        disabled={true}
+                      >
+                        <div className="spin-logo" style={{ fontSize: '32px' }}>&lt;&gt;</div>
+                        <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500' }}>
+                          Analyzing excalidraw/excalidraw...
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        className="repo-card"
+                        onClick={() => handleRepoCardClick('excalidraw/excalidraw')}
+                        disabled={isLoading || loadingDemo === 'excalidraw/excalidraw'}
+                      >
+                        <div className="repo-card-left">
+                          <svg viewBox="0 0 24 24" width="28" height="28" fill="#24292e" className="repo-gh-icon">
+                            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                          </svg>
+                          <div className="repo-card-info">
+                            <span className="repo-card-name">excalidraw/excalidraw</span>
+                            <span className="repo-card-desc">Virtual whiteboard for sketching hand-drawn like diagrams.</span>
+                          </div>
+                        </div>
+                        <div className="repo-card-arrow">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+
+                  {user && (
+                    <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.85rem', color: '#6B7280' }}>
+                      Save repos to see them here
                     </div>
-                    <div className="repo-card-arrow">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                        <polyline points="12 5 19 12 12 19"/>
-                      </svg>
-                    </div>
-                  </button>
-                )}
-              </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Soft wave */}
@@ -771,7 +866,7 @@ function App() {
       {/* ── WORKSPACE ────────────────────────────────────────────────────── */}
       {!isHome && (
         <div className="workspace-wrap">
-          <Navbar isHome={false} onLogoClick={handleGoHome} />
+          <Navbar isHome={false} onLogoClick={handleGoHome} user={user} authLoading={authLoading} onLogout={handleLogout} />
           <Breadcrumb
             repoName={analysisData ? analysisData.fullName : null}
             filePath={selectedFile ? selectedFile.path : null}
@@ -791,13 +886,64 @@ function App() {
                   <span className="ws-avatar-dot"></span>
                 </div>
                 <div className="ws-repo-info">
-                  <h2 className="ws-repo-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                  <h2 className="ws-repo-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0, flexWrap: 'wrap' }}>
                     <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" className="ws-repo-link">
                       {analysisData?.owner}/{analysisData?.repo}
                     </a>
                     <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', color: '#4F46E5', transition: 'color 0.15s ease' }} aria-label="Open on GitHub">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
+                    {(() => {
+                      const isRepoSaved = user?.savedRepos?.some(
+                        r => r.fullName === analysisData?.fullName
+                      );
+                      if (isRepoSaved) {
+                        return (
+                          <span style={{
+                            backgroundColor: '#F0FDF4',
+                            color: '#166534',
+                            border: '1px solid #BBF7D0',
+                            borderRadius: '8px',
+                            padding: '0.25rem 0.75rem',
+                            fontSize: '0.82rem',
+                            fontWeight: '500',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            marginLeft: '0.75rem'
+                          }}>
+                            ✓ Saved
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          onClick={handleSaveRepo}
+                          style={{
+                            backgroundColor: 'white',
+                            border: '1px solid #E5E7EB',
+                            color: '#374151',
+                            borderRadius: '8px',
+                            padding: '0.25rem 0.75rem',
+                            fontSize: '0.82rem',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            marginLeft: '0.75rem',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#3B82F6';
+                            e.currentTarget.style.color = '#3B82F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#E5E7EB';
+                            e.currentTarget.style.color = '#374151';
+                          }}
+                        >
+                          Save repo
+                        </button>
+                      );
+                    })()}
                   </h2>
                   {repoDescription && <p className="ws-repo-desc" style={{ margin: '0.2rem 0 0.5rem 0' }}>{repoDescription}</p>}
 
