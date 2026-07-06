@@ -8,7 +8,7 @@ import React from 'react';
  * @param {boolean} isHome - True if rendering on the home page.
  * @param {function} onLogoClick - Callback when the logo button is clicked (workspace back to home).
  */
-export default function Navbar({ isHome, onLogoClick, user, authLoading, onLogout }) {
+export default function Navbar({ isHome, onLogoClick, user, authLoading, onLogout, hasActiveFile }) {
   return (
     <header className={`site-header-shared ${isHome ? 'is-home' : 'is-workspace'}`}>
       <div className="navbar-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -32,9 +32,9 @@ export default function Navbar({ isHome, onLogoClick, user, authLoading, onLogou
               <img 
                 src={user.avatarUrl} 
                 alt={user.username}
-                style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid #E5E7EB' }}
+                style={{ width: 32, height: 32, borderRadius: '50%', border: hasActiveFile ? '2px solid #30363d' : '2px solid #E5E7EB' }}
               />
-              <span style={{ fontSize: '0.85rem', color: '#374151', fontWeight: 500 }}>
+              <span style={{ fontSize: '0.85rem', color: hasActiveFile ? 'white' : '#374151', fontWeight: 500 }}>
                 @{user.username}
               </span>
               <button 

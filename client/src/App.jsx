@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchHealth, analyzeRepository, fetchFileExplanation, fetchRawFileContent } from './services/api';
-import { getMe, logout, saveRepo } from './services/authApi';
+import { getMe, logout, saveRepo, unsaveRepo } from './services/authApi';
 import CodeViewer from './CodeViewer';
 import Navbar from './Navbar';
 import Breadcrumb from './components/Breadcrumb';
@@ -9,6 +9,74 @@ import './App.css';
 
 // ─── single source of truth for repo analysis ────────────────────────────────
 // Called by: Analyze button, repo chips, demo cards — all paths funnel here.
+
+function SaveRepoButton({ isSaved, onSave, onUnsave }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  if (isSaved) {
+    return (
+      <button
+        onClick={onUnsave}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          backgroundColor: isHovered ? '#FEF2F2' : '#F0FDF4',
+          color: isHovered ? '#991B1B' : '#166534',
+          border: '1px solid',
+          borderColor: isHovered ? '#FCA5A5' : '#BBF7D0',
+          borderRadius: '8px',
+          padding: '0.25rem 0.75rem',
+          fontSize: '0.82rem',
+          fontWeight: '500',
+          display: 'inline-flex',
+          alignItems: 'center',
+          marginLeft: '0.75rem',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease'
+        }}
+      >
+        {isHovered ? (
+          'Remove'
+        ) : (
+          <>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Saved
+          </>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={onSave}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        backgroundColor: 'white',
+        border: '1px solid',
+        borderColor: isHovered ? '#3B82F6' : '#E5E7EB',
+        color: isHovered ? '#3B82F6' : '#374151',
+        borderRadius: '8px',
+        padding: '0.25rem 0.75rem',
+        fontSize: '0.82rem',
+        fontWeight: '500',
+        cursor: 'pointer',
+        marginLeft: '0.75rem',
+        display: 'inline-flex',
+        alignItems: 'center',
+        transition: 'all 0.15s ease'
+      }}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+      </svg>
+      Save repo
+    </button>
+  );
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -56,6 +124,17 @@ function App() {
       stars: analysisData.stars || 0
     });
     if (result.saved) {
+      setUser(prev => ({
+        ...prev,
+        savedRepos: result.savedRepos
+      }));
+    }
+  };
+
+  const handleUnsaveRepo = async () => {
+    if (!user) return;
+    const result = await unsaveRepo(analysisData.owner, analysisData.repo);
+    if (result.savedRepos) {
       setUser(prev => ({
         ...prev,
         savedRepos: result.savedRepos
@@ -601,7 +680,12 @@ function App() {
             {/* Error */}
             {error && (
               <div className="hero-error">
-                <strong>Error:</strong> {error}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>{error}</span>
               </div>
             )}
 
@@ -866,7 +950,7 @@ function App() {
       {/* ── WORKSPACE ────────────────────────────────────────────────────── */}
       {!isHome && (
         <div className="workspace-wrap">
-          <Navbar isHome={false} onLogoClick={handleGoHome} user={user} authLoading={authLoading} onLogout={handleLogout} />
+          <Navbar isHome={false} onLogoClick={handleGoHome} user={user} authLoading={authLoading} onLogout={handleLogout} hasActiveFile={!!selectedFile} />
           <Breadcrumb
             repoName={analysisData ? analysisData.fullName : null}
             filePath={selectedFile ? selectedFile.path : null}
@@ -893,57 +977,11 @@ function App() {
                     <a href={`https://github.com/${analysisData?.owner}/${analysisData?.repo}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', color: '#4F46E5', transition: 'color 0.15s ease' }} aria-label="Open on GitHub">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
-                    {(() => {
-                      const isRepoSaved = user?.savedRepos?.some(
-                        r => r.fullName === analysisData?.fullName
-                      );
-                      if (isRepoSaved) {
-                        return (
-                          <span style={{
-                            backgroundColor: '#F0FDF4',
-                            color: '#166534',
-                            border: '1px solid #BBF7D0',
-                            borderRadius: '8px',
-                            padding: '0.25rem 0.75rem',
-                            fontSize: '0.82rem',
-                            fontWeight: '500',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            marginLeft: '0.75rem'
-                          }}>
-                            ✓ Saved
-                          </span>
-                        );
-                      }
-                      return (
-                        <button
-                          onClick={handleSaveRepo}
-                          style={{
-                            backgroundColor: 'white',
-                            border: '1px solid #E5E7EB',
-                            color: '#374151',
-                            borderRadius: '8px',
-                            padding: '0.25rem 0.75rem',
-                            fontSize: '0.82rem',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            marginLeft: '0.75rem',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#3B82F6';
-                            e.currentTarget.style.color = '#3B82F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#E5E7EB';
-                            e.currentTarget.style.color = '#374151';
-                          }}
-                        >
-                          Save repo
-                        </button>
-                      );
-                    })()}
+                    <SaveRepoButton
+                      isSaved={user?.savedRepos?.some(r => r.fullName === analysisData?.fullName)}
+                      onSave={handleSaveRepo}
+                      onUnsave={handleUnsaveRepo}
+                    />
                   </h2>
                   {repoDescription && <p className="ws-repo-desc" style={{ margin: '0.2rem 0 0.5rem 0' }}>{repoDescription}</p>}
 
