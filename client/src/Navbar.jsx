@@ -39,7 +39,25 @@ export default function Navbar({ isHome, onLogoClick, user, authLoading, onLogou
               </span>
               <button 
                 onClick={onLogout}
-                style={{ fontSize: '0.8rem', color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: 'white',
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: 500,
+                  backgroundColor: '#24292f',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1f2327';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#24292f';
+                }}
               >
                 Sign out
               </button>
