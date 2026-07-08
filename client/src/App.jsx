@@ -342,11 +342,14 @@ function App() {
   // ── File viewer ────────────────────────────────────────────────────────────
   const handleReadFile = (path) => {
     if (!analysisData) return;
-    const cleanPath = path.replace(/\\/g, '/');
-    const fileObj = analysisData.files.find(
+    const cleanPath = path.replace(/\\/g, '/').replace(/^\//, '');
+    let fileObj = analysisData.files.find(
       f => f.path.replace(/\\/g, '/') === cleanPath
     );
-    if (!fileObj) { setError(`Could not locate: ${path}`); return; }
+    if (!fileObj) {
+      // Graceful fallback to allow opening files suggested by AI directly from GitHub API
+      fileObj = { path: cleanPath };
+    }
     readOrderScrollPos.current = window.scrollY;
     setSelectedFile(fileObj);
     window.scrollTo({ top: 0, behavior: 'instant' });
