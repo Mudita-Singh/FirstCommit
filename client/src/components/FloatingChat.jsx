@@ -27,6 +27,7 @@ export default function FloatingChat({
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const messagesContainerRef = useRef(null)
+  const [copiedIndex, setCopiedIndex] = useState(null)
   const [size, setSize] = useState({ width: 440, height: 600 })
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -378,11 +379,12 @@ export default function FloatingChat({
           ref={panelRef}
           className={`chat-panel ${isExpanded ? 'expanded' : ''} ${isResizing ? 'resizing' : ''}`}
           onMouseDown={(e) => {
-            // Ignore dragging if clicking buttons, textareas, inputs, links, or resize handles
+            // Ignore dragging if clicking buttons, textareas, inputs, links, messages, or resize handles
             if (e.target.closest('button') || 
                 e.target.closest('textarea') || 
                 e.target.closest('input') || 
                 e.target.closest('a') ||
+                e.target.closest('.message-item') ||
                 e.target.closest('.resize-handle') ||
                 isResizing
             ) {
@@ -766,19 +768,56 @@ export default function FloatingChat({
                       width: '100%'
                     }}
                   >
-                    <div style={{
-                      background: '#E8EAFF',
-                      color: '#1E1B4B',
-                      borderRadius: '16px 16px 4px 16px',
-                      padding: '0.625rem 1rem',
-                      maxWidth: '80%',
-                      fontSize: '0.85rem',
-                      lineHeight: '1.5',
-                      fontWeight: '500',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word'
-                    }}>
-                      {msg.content}
+                    <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+                      <div style={{
+                        background: '#E8EAFF',
+                        color: '#1E1B4B',
+                        borderRadius: '16px 16px 4px 16px',
+                        padding: '0.625rem 1rem',
+                        maxWidth: '80%',
+                        fontSize: '0.85rem',
+                        lineHeight: '1.5',
+                        fontWeight: '500',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+                        {msg.content}
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.content);
+                          setCopiedIndex(i);
+                          setTimeout(() => setCopiedIndex(null), 1500);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          bottom: '6px',
+                          left: '6px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'rgba(30, 27, 75, 0.5)',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="msg-copy-btn"
+                        title="Copy message to clipboard"
+                      >
+                        {copiedIndex === i ? (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        )}
+                      </button>
                     </div>
                   </div>
                 )
@@ -820,19 +859,58 @@ export default function FloatingChat({
                       display: 'flex',
                       flexDirection: 'column'
                     }}>
-                      <div style={{
-                        background: msg.isError ? '#FEF2F2' : 'white',
-                        border: msg.isError ? '1px solid #FECACA' : '1px solid #E5E7EB',
-                        borderRadius: '16px 16px 16px 4px',
-                        padding: '0.625rem 1rem',
-                        fontSize: '0.85rem',
-                        lineHeight: '1.65',
-                        color: msg.isError ? '#991B1B' : '#111827',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
-                      }}>
-                        {msg.content}
+                      <div style={{ position: 'relative', width: '100%' }}>
+                        <div style={{
+                          background: msg.isError ? '#FEF2F2' : 'white',
+                          border: msg.isError ? '1px solid #FECACA' : '1px solid #E5E7EB',
+                          borderRadius: '16px 16px 16px 4px',
+                          padding: '0.625rem 1.875rem 0.625rem 1rem',
+                          fontSize: '0.85rem',
+                          lineHeight: '1.65',
+                          color: msg.isError ? '#991B1B' : '#111827',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'
+                        }}>
+                          {msg.content}
+                        </div>
+                        {!msg.isError && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(msg.content);
+                              setCopiedIndex(i);
+                              setTimeout(() => setCopiedIndex(null), 1500);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '6px',
+                              right: '6px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#9CA3AF',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="msg-copy-btn"
+                            title="Copy message to clipboard"
+                          >
+                            {copiedIndex === i ? (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
                       </div>
                       {msg.ragUsed && (
                         <div style={{
@@ -1205,6 +1283,17 @@ export default function FloatingChat({
           background: #E5E7EB;
           color: #9CA3AF;
           cursor: not-allowed;
+        }
+        
+        .msg-copy-btn {
+          opacity: 0;
+          transition: opacity 0.15s ease, color 0.15s ease;
+        }
+        .message-item:hover .msg-copy-btn {
+          opacity: 1;
+        }
+        .msg-copy-btn:hover {
+          color: #4B5563 !important;
         }
       `}</style>
     </>
