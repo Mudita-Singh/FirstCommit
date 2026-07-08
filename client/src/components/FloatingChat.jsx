@@ -377,6 +377,25 @@ export default function FloatingChat({
         <div 
           ref={panelRef}
           className={`chat-panel ${isExpanded ? 'expanded' : ''} ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={(e) => {
+            // Ignore dragging if clicking buttons, textareas, inputs, links, or resize handles
+            if (e.target.closest('button') || 
+                e.target.closest('textarea') || 
+                e.target.closest('input') || 
+                e.target.closest('a') ||
+                e.target.closest('.resize-handle') ||
+                isResizing
+            ) {
+              return
+            }
+            setIsDragging(true)
+            const rect = panelRef.current.getBoundingClientRect()
+            dragOffset.current = {
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top
+            }
+            e.preventDefault()
+          }}
           style={
             position === null ? {
               position: 'fixed',
@@ -398,6 +417,7 @@ export default function FloatingChat({
           
           {/* Resize handles */}
           <div
+            className="resize-handle"
             onMouseDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
@@ -421,6 +441,7 @@ export default function FloatingChat({
             }}
           />
           <div
+            className="resize-handle"
             onMouseDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
@@ -444,6 +465,7 @@ export default function FloatingChat({
             }}
           />
           <div
+            className="resize-handle"
             onMouseDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
@@ -467,6 +489,7 @@ export default function FloatingChat({
             }}
           />
           <div
+            className="resize-handle"
             onMouseDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
@@ -492,16 +515,6 @@ export default function FloatingChat({
           
           {/* Header */}
           <div 
-            onMouseDown={(e) => {
-              if (e.target.closest('button')) return
-              setIsDragging(true)
-              const rect = panelRef.current.getBoundingClientRect()
-              dragOffset.current = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-              }
-              e.preventDefault()
-            }}
             style={{
               padding: '1rem 1.25rem',
               background: '#E8EAFF',
