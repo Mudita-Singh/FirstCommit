@@ -33,9 +33,7 @@ const PORT = process.env.PORT || 5000;
 // Enable Cross-Origin Resource Sharing (CORS)
 // This permits our frontend (on another port) to send requests to this server
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? 'https://your-vercel-url.vercel.app'
-    : 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true  // ← THIS IS CRITICAL for cookies
 }));
 
@@ -60,6 +58,7 @@ const healthRouter = require('./routes/health.routes');
 const repoRouter = require('./routes/repo.routes');
 const fileRouter = require('./routes/file.routes');
 const issueRouter = require('./routes/issue.routes');
+const chatRouter = require('./routes/chat.routes');
 
 // Mount routes
 app.use('/api/health', healthRouter);
@@ -67,6 +66,7 @@ app.use('/api/repo', repoRouter);
 app.use('/api/file', fileRouter);
 app.use('/api/issues', issueRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/chat', chatRouter);
 
 // Start listening for incoming network requests
 app.listen(PORT, () => {

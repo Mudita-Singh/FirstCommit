@@ -5,6 +5,7 @@ import CodeViewer from './CodeViewer';
 import Navbar from './Navbar';
 import Breadcrumb from './components/Breadcrumb';
 import IssueExplorer from './components/IssueExplorer';
+import FloatingChat from './components/FloatingChat';
 import './App.css';
 
 // ─── single source of truth for repo analysis ────────────────────────────────
@@ -95,6 +96,7 @@ function App() {
   const [techStack, setTechStack] = useState([]);
   const [repoDescription, setRepoDescription] = useState('');
   const [activeTab, setActiveTab] = useState('readOrder');
+  const selectedIssue = null;
 
   useEffect(() => {
     getMe()
@@ -340,7 +342,10 @@ function App() {
   // ── File viewer ────────────────────────────────────────────────────────────
   const handleReadFile = (path) => {
     if (!analysisData) return;
-    const fileObj = analysisData.files.find(f => f.path === path);
+    const cleanPath = path.replace(/\\/g, '/');
+    const fileObj = analysisData.files.find(
+      f => f.path.replace(/\\/g, '/') === cleanPath
+    );
     if (!fileObj) { setError(`Could not locate: ${path}`); return; }
     readOrderScrollPos.current = window.scrollY;
     setSelectedFile(fileObj);
@@ -1267,6 +1272,18 @@ function App() {
               />
             )}
           </div>
+          {analysisData && !selectedFile && (
+            <FloatingChat
+              owner={analysisData.owner}
+              repo={analysisData.repo}
+              description={analysisData.description || repoDescription}
+              techStack={analysisData.techStack || techStack}
+              fileTree={analysisData.files?.map(f => f.path)}
+              currentTab={activeTab}
+              selectedIssue={selectedIssue}
+              selectedFile={selectedFile}
+            />
+          )}
           {selectedFile && (
             <CodeViewer
               repoOwner={analysisData.owner}

@@ -722,10 +722,10 @@ export default function IssueExplorer({ owner, repo, fileTree, onFileOpen, tabBa
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#9CA3AF', fontWeight: '500', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#4B5563', fontWeight: '600', marginBottom: '0.25rem' }}>
                 No issues found with current filters
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#D1D5DB' }}>
+              <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
                 Try changing the label or assignment filter
               </div>
             </div>

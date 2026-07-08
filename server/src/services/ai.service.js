@@ -4,6 +4,25 @@ const { getCached, setCached } = require('./cache.service');
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
+async function callWithRetry(fn, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const is503 = error.message?.includes('503');
+      const is429 = error.message?.includes('429');
+      
+      if ((is503 || is429) && attempt < maxRetries) {
+        const delay = attempt * 2000; // 2s, 4s, 6s
+        console.log(`Gemini error (attempt ${attempt}), retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 // In-flight request deduplication — prevents duplicate simultaneous Gemini calls
 // for the same cache key when two requests race before either one has written.
 const inFlightRequests = new Map();
@@ -298,12 +317,12 @@ async function generateReadingList(repoName, files) {
         `\n` +
         `Produce the reading list JSON array now. Remember: max 2 meta/docs files, all other entries must be source code files.`;
 
-      const result = await model.generateContent({
+      const result = await callWithRetry(() => model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json' // Force structured JSON output
         }
-      });
+      }));
 
       const responseText = result.response.text();
       const parsedData = JSON.parse(responseText);
@@ -393,12 +412,12 @@ async function generateFileExplanation(filePath, code) {
       systemInstruction: EXPLAIN_FILE_PROMPT
     });
 
-    const result = await model.generateContent({
+    const result = await callWithRetry(() => model.generateContent({
       contents: [{ role: 'user', parts: [{ text: code }] }],
       generationConfig: {
         responseMimeType: 'application/json' // Instruct Gemini to return valid JSON
       }
-    });
+    }));
 
     const responseText = result.response.text();
     
@@ -841,12 +860,12 @@ Code:
 ${numberedCode}`;
 
     console.log("CALLING REAL AI");
-    const result = await model.generateContent({
+    const result = await callWithRetry(() => model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: 'application/json'
       }
-    });
+    }));
 
     const responseText = result.response.text();
     const parsedData = JSON.parse(responseText);

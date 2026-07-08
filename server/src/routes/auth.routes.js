@@ -11,9 +11,8 @@ const router = express.Router()
 passport.use(new GitHubStrategy({
   clientID: process.env.GITHUB_CLIENT_ID,
   clientSecret: process.env.GITHUB_CLIENT_SECRET,
-  callbackURL: process.env.NODE_ENV === 'production'
-    ? 'https://your-render-url.onrender.com/api/auth/github/callback'
-    : 'http://localhost:5000/api/auth/github/callback',
+  callbackURL: process.env.GITHUB_CALLBACK_URL || 
+    'http://localhost:5000/api/auth/github/callback',
   scope: ['user:email', 'public_repo']
 }, async (accessToken, refreshToken, profile, done) => {
   try {
@@ -68,9 +67,7 @@ router.get('/github',
 // GitHub redirects here after authorization
 router.get('/github/callback',
   passport.authenticate('github', { 
-    failureRedirect: process.env.NODE_ENV === 'production'
-      ? 'https://your-vercel-url.vercel.app/?error=auth_failed'
-      : 'http://localhost:5173/?error=auth_failed',
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/?error=auth_failed`,
     session: false
   }),
   async (req, res) => {
@@ -89,16 +86,13 @@ router.get('/github/callback',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       })
 
-      const redirectUrl = process.env.NODE_ENV === 'production'
-        ? 'https://your-vercel-url.vercel.app'
-        : 'http://localhost:5173'
+      const redirectUrl = process.env.CLIENT_URL || 
+        'http://localhost:5173'
       
       res.redirect(redirectUrl)
     } catch (error) {
       res.redirect(
-        process.env.NODE_ENV === 'production'
-          ? 'https://your-vercel-url.vercel.app/?error=auth_failed'
-          : 'http://localhost:5173/?error=auth_failed'
+        `${process.env.CLIENT_URL || 'http://localhost:5173'}/?error=auth_failed`
       )
     }
   }
