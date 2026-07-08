@@ -57,7 +57,7 @@ async function fetchRepoStructure(owner, repo) {
   }
 
   // If we reach here, both branches failed or threw an error
-  throw lastError || new Error(`Repository not found or branch structure not supported.`);
+  throw lastError || new Error(`Repository not found. If this is a private repository, please check that your GitHub token has permissions to access private repositories.`);
 }
 
 /**
