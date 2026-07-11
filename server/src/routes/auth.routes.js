@@ -7,6 +7,11 @@ const { requireAuth } = require('../middleware/auth.middleware')
 
 const router = express.Router()
 
+const CLIENT_URL = process.env.CLIENT_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://firstcommit-6fpzndyg8-smudita900-8475s-projects.vercel.app' 
+    : 'http://localhost:5173');
+
 // Configure GitHub strategy
 passport.use(new GitHubStrategy({
   clientID: process.env.GITHUB_CLIENT_ID,
@@ -67,7 +72,7 @@ router.get('/github',
 // GitHub redirects here after authorization
 router.get('/github/callback',
   passport.authenticate('github', { 
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/?error=auth_failed`,
+    failureRedirect: `${CLIENT_URL}/?error=auth_failed`,
     session: false
   }),
   async (req, res) => {
@@ -86,13 +91,12 @@ router.get('/github/callback',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       })
 
-      const redirectUrl = process.env.CLIENT_URL || 
-        'http://localhost:5173'
+      const redirectUrl = CLIENT_URL
       
       res.redirect(redirectUrl)
     } catch (error) {
       res.redirect(
-        `${process.env.CLIENT_URL || 'http://localhost:5173'}/?error=auth_failed`
+        `${CLIENT_URL}/?error=auth_failed`
       )
     }
   }
