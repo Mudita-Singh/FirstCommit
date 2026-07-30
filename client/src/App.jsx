@@ -114,7 +114,7 @@ function App() {
 
   const handleSaveRepo = async () => {
     if (!user) {
-      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/github`;
+      window.location.href = `${import.meta.env.VITE_API_URL || 'https://firstcommit-4y9h.onrender.com'}/api/auth/github`;
       return;
     }
     const result = await saveRepo({
