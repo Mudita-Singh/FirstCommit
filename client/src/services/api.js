@@ -1,4 +1,4 @@
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'https://firstcommit-4y9h.onrender.com'}/api`;
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : 'https://firstcommit-4y9h.onrender.com')}/api`;
 
 /**
  * Fetch the health status of the Express server API.

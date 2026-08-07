@@ -17,7 +17,9 @@ passport.use(new GitHubStrategy({
   clientID: process.env.GITHUB_CLIENT_ID,
   clientSecret: process.env.GITHUB_CLIENT_SECRET,
   callbackURL: process.env.GITHUB_CALLBACK_URL || 
-    'https://firstcommit-4y9h.onrender.com/api/auth/github/callback',
+    (process.env.NODE_ENV === 'production' 
+      ? 'https://firstcommit-4y9h.onrender.com/api/auth/github/callback' 
+      : 'http://localhost:5000/api/auth/github/callback'),
   scope: ['user:email', 'public_repo']
 }, async (accessToken, refreshToken, profile, done) => {
   try {

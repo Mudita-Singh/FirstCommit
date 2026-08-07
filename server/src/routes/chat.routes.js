@@ -9,6 +9,8 @@ const {
   indexRepo 
 } = require('../services/pinecone.service')
 const githubService = require('../services/github.service')
+const { fetchRepoIssues } = require('../services/issue.service')
+const { getCached } = require('../services/cache.service')
 
 // POST /api/chat/message
 // Send a chat message and get a response
@@ -30,9 +32,25 @@ router.post('/message', async (req, res) => {
       context.repo
     )
     context.isIndexed = indexed
+
+    // Attach repository open issues to chat context for live issue awareness
+    if (!context.issues || !Array.isArray(context.issues) || context.issues.length === 0) {
+      try {
+        const cacheKey = `issues:v2:${context.owner}:${context.repo}`
+        const cached = await getCached(cacheKey, 'github')
+        if (cached?.issues) {
+          context.issues = cached.issues
+        } else {
+          const fetched = await fetchRepoIssues(context.owner, context.repo)
+          context.issues = fetched.issues || []
+        }
+      } catch (issueErr) {
+        console.warn(`Could not load issue context for chat: ${issueErr.message}`)
+      }
+    }
     
     console.log(`Chat: ${context.owner}/${context.repo}`, 
-      `RAG: ${indexed}`)
+      `RAG: ${indexed}, Issues: ${context.issues?.length || 0}`)
     
     const response = await generateChatResponse(
       message,

@@ -23,6 +23,50 @@ async function callWithRetry(fn, maxRetries = 3) {
   }
 }
 
+/**
+ * Safely parses JSON responses returned by AI models.
+ * Handles markdown code fences, leading/trailing non-JSON commentary, and trailing commas.
+ */
+function safeParseJSON(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    throw new Error('Empty or non-string response received from AI model.');
+  }
+
+  let cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+  const firstBracket = cleaned.indexOf('[');
+  const firstBrace = cleaned.indexOf('{');
+  
+  let startIdx = -1;
+  let endIdx = -1;
+
+  if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+    startIdx = firstBracket;
+    endIdx = cleaned.lastIndexOf(']');
+  } else if (firstBrace !== -1) {
+    startIdx = firstBrace;
+    endIdx = cleaned.lastIndexOf('}');
+  }
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    cleaned = cleaned.slice(startIdx, endIdx + 1);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (firstErr) {
+    const sanitized = cleaned.replace(/,\s*([}\]])/g, '$1');
+    try {
+      return JSON.parse(sanitized);
+    } catch (secondErr) {
+      console.error('safeParseJSON failed to parse AI output:', firstErr.message);
+      console.error('Raw response text:', rawText);
+      throw firstErr;
+    }
+  }
+}
+
+
 // In-flight request deduplication — prevents duplicate simultaneous Gemini calls
 // for the same cache key when two requests race before either one has written.
 const inFlightRequests = new Map();
@@ -325,7 +369,7 @@ async function generateReadingList(repoName, files) {
       }));
 
       const responseText = result.response.text();
-      const parsedData = JSON.parse(responseText);
+      const parsedData = safeParseJSON(responseText);
 
       if (!Array.isArray(parsedData)) {
         throw new Error('AI output was not in the expected array structure.');
@@ -420,9 +464,7 @@ async function generateFileExplanation(filePath, code) {
     }));
 
     const responseText = result.response.text();
-    
-    // Parse the returned JSON
-    const parsedJson = JSON.parse(responseText);
+    const parsedJson = safeParseJSON(responseText);
     return parsedJson;
   } catch (error) {
     console.error('Error generating AI file explanation:', error);
@@ -868,7 +910,7 @@ ${numberedCode}`;
     }));
 
     const responseText = result.response.text();
-    const parsedData = JSON.parse(responseText);
+    const parsedData = safeParseJSON(responseText);
 
     if (typeof parsedData !== 'object' || parsedData === null) {
       throw new Error('AI output was not in the expected object structure.');

@@ -1,5 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_URL 
-  || 'https://firstcommit-4y9h.onrender.com'
+  || (import.meta.env.DEV ? 'http://localhost:5000' : 'https://firstcommit-4y9h.onrender.com')
 
 export const getMe = async () => {
   const res = await fetch(`${API_BASE}/api/auth/me`, {

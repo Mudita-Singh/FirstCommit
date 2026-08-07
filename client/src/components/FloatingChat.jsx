@@ -10,7 +10,8 @@ export default function FloatingChat({
   fileTree,
   currentTab,
   selectedIssue,
-  selectedFile
+  selectedFile,
+  issues
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState([])

@@ -63,6 +63,15 @@ Current context:`
     prompt += `\nUser has file open: ${selectedFile}`
   }
 
+  if (context.issues && Array.isArray(context.issues) && context.issues.length > 0) {
+    prompt += `\n\nActive open issues in repository ${owner}/${repo} (${context.issues.length} total fetched):\n` +
+      context.issues.slice(0, 30).map(i => {
+        const labels = Array.isArray(i.labels) ? i.labels.join(', ') : '';
+        const bodySnippet = i.body ? i.body.slice(0, 150).replace(/\s+/g, ' ') : '';
+        return `- Issue #${i.number}: "${i.title}" [Difficulty: ${i.difficulty || 'Unknown'}${labels ? `, Labels: ${labels}` : ''}] ${bodySnippet ? `\n  Description snippet: ${bodySnippet}` : ''}`;
+      }).join('\n');
+  }
+
   prompt += `
 
 Your role:
