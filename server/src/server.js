@@ -28,6 +28,9 @@ const { router: authRouter, passport } = require('./routes/auth.routes');
 
 // Initialize the Express application
 const app = express();
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Define the port to listen on
 const PORT = process.env.PORT || 5000;
