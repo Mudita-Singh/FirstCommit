@@ -23,6 +23,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const { router: authRouter, passport } = require('./routes/auth.routes');
 
 // Initialize the Express application
@@ -43,8 +44,10 @@ app.use(session({
   secret: process.env.JWT_SECRET || 'firstcommit-session-secret',
   resave: false,
   saveUninitialized: false,
+  store: mongoUrl ? MongoStore.create({ mongoUrl }) : undefined,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production' 
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 }));
 app.use(passport.initialize());
