@@ -1,5 +1,11 @@
 # 🚀 FirstCommit
 
+> **Understand any GitHub repository before contributing.**
+
+🌐 **Live Application**: [https://firstcommit-ten.vercel.app/](https://firstcommit-ten.vercel.app/)
+
+![FirstCommit Dashboard](./assets/firstcommit-preview.png)
+
 FirstCommit is a premium developer tool designed to help first-time open-source contributors easily explore, understand, and start contributing to any public GitHub repository. By analyzing the codebase structure, generating sequential reading paths, and providing step-by-step AI implementation blueprints for issues, FirstCommit removes the initial friction of onboarding onto new codebases.
 
 ---
