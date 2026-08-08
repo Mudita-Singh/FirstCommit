@@ -6,16 +6,17 @@ console.log('Model:', process.env.GEMINI_MODEL);
 console.log('GitHub token loaded:', !!process.env.GITHUB_TOKEN);
 const mongoose = require('mongoose');
 
-if (process.env.MONGODB_URI) {
-  console.log('Attempting MongoDB connection to:', process.env.MONGODB_URI?.slice(0, 30) + '...');
-  mongoose.connect(process.env.MONGODB_URI)
+const mongoUrl = process.env.MONGODB_URL || process.env.MONGODB_URI;
+if (mongoUrl) {
+  console.log('Attempting MongoDB connection to:', mongoUrl?.slice(0, 30) + '...');
+  mongoose.connect(mongoUrl)
     .then(() => console.log('MongoDB connected to Atlas'))
     .catch(err => {
       console.error('MongoDB connection FAILED:', err.message);
       console.log('Continuing without database caching...');
     });
 } else {
-  console.log('MONGODB_URI not found in env, continuing without database caching...');
+  console.log('MONGODB_URL not found in env, continuing without database caching...');
 }
 
 const express = require('express');
@@ -70,7 +71,8 @@ app.use('/api/chat', chatRouter);
 
 // Start listening for incoming network requests
 app.listen(PORT, () => {
-  console.log(`Server is running in development mode on http://localhost:${PORT}`);
+  const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+  console.log(`Server is running in ${mode} mode on http://localhost:${PORT}`);
 });
 
 // Auto-trigger reload 3
