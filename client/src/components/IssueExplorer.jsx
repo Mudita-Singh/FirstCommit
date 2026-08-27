@@ -1161,15 +1161,39 @@ export default function IssueExplorer({ owner, repo, fileTree, onFileOpen, tabBa
                     margin: '0 0 0.5rem 0',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.4rem'
+                    justifyContent: 'space-between',
+                    gap: '0.4rem',
+                    flexWrap: 'wrap'
                   }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="9" y1="9" x2="15" y2="9"></line>
-                      <line x1="9" y1="13" x2="15" y2="13"></line>
-                      <line x1="9" y1="17" x2="15" y2="17"></line>
-                    </svg>
-                    <span>What Needs to Change</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="9" x2="15" y2="9"></line>
+                        <line x1="9" y1="13" x2="15" y2="13"></line>
+                        <line x1="9" y1="17" x2="15" y2="17"></line>
+                      </svg>
+                      <span>What Needs to Change</span>
+                    </div>
+                    {analysis.ragUsed && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        backgroundColor: '#ECFDF5',
+                        color: '#065F46',
+                        border: '1px solid #A7F3D0',
+                        borderRadius: '9999px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        padding: '0.2rem 0.6rem'
+                      }} title={`Grounded in files via Pinecone vector search: ${(analysis.groundedFiles || []).join(', ')}`}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        Grounded in {analysis.groundedFiles?.length || 0} relevant files via Pinecone RAG
+                      </span>
+                    )}
                   </h3>
                   <div style={{
                     fontSize: '0.875rem',

@@ -133,11 +133,13 @@ function isCodeFileOrDoc(file) {
  * @access  Public
  */
 router.post('/structure', async (req, res) => {
-  const { url } = req.body;
+  const { url, fileCount } = req.body;
 
   if (!url) {
     return res.status(400).json({ status: 'error', message: 'Please provide a GitHub repository URL.' });
   }
+
+  const requestedCount = Math.min(Math.max(parseInt(fileCount, 10) || 10, 5), 30);
 
   // 1. Parse the URL
   const repoInfo = parseGithubUrl(url);
@@ -166,10 +168,10 @@ router.post('/structure', async (req, res) => {
         url: `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`
       }));
 
-    console.log(`[filter] ${rawTree.length} raw → ${cleanFiles.length} clean files for ${owner}/${repo}`);
+    console.log(`[filter] ${rawTree.length} raw → ${cleanFiles.length} clean files for ${owner}/${repo} (requested fileCount: ${requestedCount})`);
 
     // 4. Generate the ordered reading list with AI
-    const rawReadingList = await generateReadingList(repo, cleanFiles);
+    const rawReadingList = await generateReadingList(repo, cleanFiles, requestedCount);
 
     // 5. DEFENCE-IN-DEPTH: drop any file the AI returned that wasn't in our clean list.
     //    This guards against the model hallucinating paths from the unfiltered tree.

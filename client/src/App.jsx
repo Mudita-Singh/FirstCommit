@@ -83,6 +83,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [repoUrl, setRepoUrl] = useState('');
+  const [fileCount, setFileCount] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState(null);
   const [loadingDemo, setLoadingDemo] = useState(null);
@@ -176,8 +177,10 @@ function App() {
   }, []);
 
   // ── Core analysis function ─────────────────────────────────────────────────
-  const analyzeUrl = useCallback(async (targetUrl, demoName = null) => {
+  const analyzeUrl = useCallback(async (targetUrl, demoName = null, requestedCount = null) => {
     if (!targetUrl.trim()) return;
+
+    const countToUse = requestedCount || fileCount;
 
     if (demoName) {
       setLoadingDemo(demoName);
@@ -194,7 +197,7 @@ function App() {
     }
 
     try {
-      const response = await analyzeRepository(cleanUrl);
+      const response = await analyzeRepository(cleanUrl, countToUse);
       if (response?.status === 'success') {
         // Push a new history entry so Back button works
         window.history.pushState({ view: 'workspace', url: cleanUrl }, '', '/workspace');
@@ -211,7 +214,7 @@ function App() {
       setIsLoading(false);
       setLoadingDemo(null);
     }
-  }, []);
+  }, [fileCount]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -667,6 +670,30 @@ function App() {
                   onChange={e => setRepoUrl(e.target.value)}
                   disabled={isLoading || loadingDemo !== null}
                 />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginRight: '0.4rem', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>Files:</span>
+                  <select
+                    value={fileCount}
+                    onChange={e => setFileCount(Number(e.target.value))}
+                    disabled={isLoading || loadingDemo !== null}
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.6rem',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      color: '#334155',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={5}>5 files</option>
+                    <option value={10}>10 files</option>
+                    <option value={15}>15 files</option>
+                    <option value={20}>20 files</option>
+                    <option value={30}>30 files</option>
+                  </select>
+                </div>
                 <button
                   type="submit"
                   className="search-btn"
@@ -1187,7 +1214,37 @@ function App() {
               </div>
 
               {activeTab === 'readOrder' && (
-                <span className="ws-count-badge">{analysisData.readingList.length} items</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <label style={{ fontSize: '0.78rem', color: '#4B5563', fontWeight: '600' }}>Count:</label>
+                  <select
+                    value={fileCount}
+                    onChange={(e) => {
+                      const newCount = Number(e.target.value);
+                      setFileCount(newCount);
+                      if (analysisData) {
+                        analyzeUrl(`https://github.com/${analysisData.owner}/${analysisData.repo}`, null, newCount);
+                      }
+                    }}
+                    disabled={isLoading}
+                    style={{
+                      backgroundColor: 'white',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.78rem',
+                      fontWeight: '600',
+                      color: '#111827',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={5}>5 files</option>
+                    <option value={10}>10 files</option>
+                    <option value={15}>15 files</option>
+                    <option value={20}>20 files</option>
+                    <option value={30}>30 files</option>
+                  </select>
+                  <span className="ws-count-badge">{analysisData.readingList.length} items</span>
+                </div>
               )}
             </div>
 

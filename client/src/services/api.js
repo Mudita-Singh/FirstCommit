@@ -20,16 +20,17 @@ export const fetchHealth = async () => {
 /**
  * Sends a GitHub URL to the server for analysis and returns the reading list.
  * @param {string} url - The GitHub repository URL.
+ * @param {number} fileCount - Number of files requested in the reading order.
  * @returns {Promise<object>} JSON response containing the analysis details.
  */
-export const analyzeRepository = async (url) => {
+export const analyzeRepository = async (url, fileCount = 10) => {
   try {
     const response = await fetch(`${API_BASE_URL}/repo/structure`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, fileCount }),
     });
 
     const result = await response.json();
