@@ -93,7 +93,7 @@ router.post('/analyze', async (req, res) => {
     });
   }
 
-  const cacheKey = `issueAnalysis:v4:${owner}:${repo}:${issueNumber}`;
+  const cacheKey = `issueAnalysis:v5:${owner}:${repo}:${issueNumber}`;
 
   try {
     // 1. Check Cache

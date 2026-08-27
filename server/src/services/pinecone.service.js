@@ -147,9 +147,26 @@ async function deleteRepoIndex(owner, repo) {
   }
 }
 
+// Query relevant code chunks with indexing check fallback
+async function queryRelevantChunks(owner, repo, queryText, topK = 5) {
+  try {
+    const indexed = await isRepoIndexed(owner, repo);
+    if (!indexed) {
+      console.log(`[Pinecone] ${owner}/${repo} is not indexed yet.`);
+      return [];
+    }
+    return await searchRepo(owner, repo, queryText, topK);
+  } catch (error) {
+    console.error('[Pinecone] queryRelevantChunks failed:', error.message);
+    return [];
+  }
+}
+
 module.exports = { 
   isRepoIndexed, 
   indexRepo, 
   searchRepo,
+  queryRelevantChunks,
   deleteRepoIndex
 }
+

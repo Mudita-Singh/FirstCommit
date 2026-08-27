@@ -3,6 +3,7 @@
  * Handles fetching open issues from GitHub and analyzing them using Gemini.
  */
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { queryRelevantChunks } = require('./pinecone.service');
 
 /**
  * detectDifficulty Helper
@@ -152,12 +153,42 @@ async function analyzeIssue(owner, repo, issue, fileTree) {
     difficultyScore: 2,
     testsNeeded: false,
     totalLinesOfCode: 0,
-    firstStep: 'Read the issue on GitHub carefully, then search the codebase for relevant files mentioned in the description.'
+    firstStep: 'Read the issue on GitHub carefully, then search the codebase for relevant files mentioned in the description.',
+    ragUsed: false,
+    groundedFiles: []
   };
 
   if (!apiKey) {
     console.warn('⚠️ GEMINI_API_KEY is missing. Returning fallback issue analysis.');
     return fallback;
+  }
+
+  // 1. Retrieve RAG code chunks from Pinecone vector database
+  let chunks = [];
+  try {
+    const queryText = `${issue.title}\n${issue.body || ''}`;
+    chunks = await queryRelevantChunks(owner, repo, queryText, 6);
+    console.log(`[RAG] Retrieved ${chunks.length} chunks from Pinecone for issue #${issue.number}`);
+  } catch (err) {
+    console.warn('[RAG] Pinecone search failed, proceeding without RAG context:', err.message);
+  }
+
+  const ragUsed = chunks.length > 0;
+  const groundedFiles = Array.from(new Set(chunks.map(c => c.filePath).filter(Boolean)));
+
+  let ragContextSection = '';
+  if (ragUsed) {
+    const formattedChunks = chunks.map((c, i) =>
+      `--- [Chunk ${i + 1}] File: ${c.filePath} (Lines ${c.startLine || '?'}-${c.endLine || '?'}) ---\n${c.text}`
+    ).join('\n\n');
+
+    ragContextSection =
+      `\n\nRELEVANT REPOSITORY CODE CHUNKS RETRIEVED VIA PINECONE VECTOR SEARCH (RAG):\n` +
+      `${formattedChunks}\n\n` +
+      `GROUNDING REQUIREMENT:\n` +
+      `- Use the actual code chunks above to identify exact file paths, line numbers, and function names.\n` +
+      `- In filesToTouch, prioritize files found in the retrieved code chunks above.\n` +
+      `- In codeSnippet, include accurate code snippets matching the retrieved code context.`;
   }
 
   try {
@@ -170,45 +201,46 @@ async function analyzeIssue(owner, repo, issue, fileTree) {
 
 Repository: ${owner}/${repo}
 Issue #${issue.number}: ${issue.title}
-${issue.body ? `Description:\n${issue.body}` : 'No description provided — analyze from title only.'}
+${issue.body ? `Description:\n${issue.body}` : 'No description provided - analyze from title only.'}
 
 Repository files:
 ${fileTree.slice(0, 150).join('\n')}
+${ragContextSection}
 
 Respond ONLY with valid JSON. No markdown, no backticks:
 {
-  'summary': 'one clear sentence: what needs to change and why',
-  'whyItMatters': 'one sentence: why this bug/feature matters, what goes wrong without the fix',
-  'startHere': [
+  "summary": "one clear sentence: what needs to change and why",
+  "whyItMatters": "one sentence: why this bug/feature matters, what goes wrong without the fix",
+  "startHere": [
     {
-      'step': 1,
-      'action': 'short action title (max 5 words)',
-      'detail': 'one sentence explaining this step'
+      "step": 1,
+      "action": "short action title (max 5 words)",
+      "detail": "one sentence explaining this step"
     }
   ],
-  'filesToTouch': [
+  "filesToTouch": [
     {
-      'path': 'exact/file/path.js',
-      'lines': '104-123',
-      'lineCount': 20,
-      'reason': 'one sentence why this file',
-      'confidence': 95,
-      'codeSnippet': 'actual relevant code lines — max 8 lines, only if confident about exact location, empty string if unsure'
+      "path": "exact/file/path.js",
+      "lines": "104-123",
+      "lineCount": 20,
+      "reason": "one sentence why this file",
+      "confidence": 95,
+      "codeSnippet": "actual relevant code lines - max 8 lines, only if confident about exact location, empty string if unsure"
     }
   ],
-  'filesToIgnore': ['tests/', 'build/', 'node_modules/'],
-  'estimatedMinutes': '20-30',
-  'difficulty': 'Easy or Medium or Hard',
-  'difficultyReason': 'one sentence',
-  'difficultyScore': 2,
-  'testsNeeded': true or false,
-  'totalLinesOfCode': 20
+  "filesToIgnore": ["tests/", "build/", "node_modules/"],
+  "estimatedMinutes": "20-30",
+  "difficulty": "Easy or Medium or Hard",
+  "difficultyReason": "one sentence",
+  "difficultyScore": 2,
+  "testsNeeded": true,
+  "totalLinesOfCode": 20
 }
 
 Rules:
 - startHere: 3-5 concrete steps a beginner follows in order. Step 1 always opens a specific file. Last step always runs tests or verifies the fix.
 - filesToTouch: max 5, sorted by confidence descending. confidence is 0-100 integer.
-- estimatedMinutes: realistic estimate like '15-20', '30-45', '1-2 hours'. Be honest — don't underestimate.
+- estimatedMinutes: realistic estimate like '15-20', '30-45', '1-2 hours'. Be honest - do not underestimate.
 - difficultyScore: 1=very easy, 2=easy, 3=medium, 4=hard, 5=very hard. Used for dot rating display.
 - totalLinesOfCode: sum of all filesToTouch lineCount values.
 - If issue body is empty, base everything on title only. Lower confidence scores, fewer files, vaguer steps.`;
@@ -262,7 +294,9 @@ Rules:
       difficultyReason: parsedData.difficultyReason || parsedData.DifficultyReason || '',
       difficultyScore: typeof parsedData.difficultyScore === 'number' ? parsedData.difficultyScore : 2,
       testsNeeded: parsedData.testsNeeded === true || parsedData.testsNeeded === 'true',
-      totalLinesOfCode: typeof parsedData.totalLinesOfCode === 'number' ? parsedData.totalLinesOfCode : 0
+      totalLinesOfCode: typeof parsedData.totalLinesOfCode === 'number' ? parsedData.totalLinesOfCode : 0,
+      ragUsed,
+      groundedFiles
     };
   } catch (error) {
     console.error('Error analyzing issue with Gemini:', error);

@@ -108,10 +108,11 @@ function getAIClient() {
  * Generates a mock reading list if the user hasn't configured a Gemini API key.
  * This ensures the application is immediately testable without configuration.
  */
-function getMockReadingList(files) {
+function getMockReadingList(files, fileCount = 10) {
   console.warn('⚠️ GEMINI_API_KEY is missing in server/.env. Falling back to Mock AI reading list.');
 
   const mockList = [];
+  const limit = Math.min(Math.max(parseInt(fileCount, 10) || 10, 5), 30);
   
   // Look for README.md first
   const readme = files.find(f => f.path.toLowerCase() === 'readme.md');
@@ -133,9 +134,10 @@ function getMockReadingList(files) {
     });
   }
 
-  // Add up to 3 other files with high-quality, specific, non-templated descriptions
+  // Add up to remaining files with high-quality, specific, non-templated descriptions
+  const needed = Math.max(1, limit - mockList.length);
   const otherFiles = files.filter(f => f.path.toLowerCase() !== 'readme.md' && f.path.toLowerCase() !== 'package.json');
-  otherFiles.slice(0, 3).forEach((file) => {
+  otherFiles.slice(0, needed).forEach((file) => {
     const name = file.path.split('/').pop();
     const nameLower = name.toLowerCase();
     const dir = file.path.includes('/') ? file.path.split('/').slice(-2, -1)[0] : '';
@@ -239,7 +241,7 @@ function warnIfDuplicateExplanations(readingList, threshold = 0.7) {
  * @param {Array} files - Array of file objects [{ path, size, url }].
  * @returns {Promise<Array>} Sorted reading list with explanations.
  */
-async function generateReadingList(repoName, files) {
+async function generateReadingList(repoName, files, fileCount = 10) {
   // Extract owner and repo for cache key
   let owner = '';
   let repo = repoName;
@@ -254,7 +256,9 @@ async function generateReadingList(repoName, files) {
       repo = match[2];
     }
   }
-  const lockKey = `readOrder:${owner}:${repo}`;
+  const count = Math.min(Math.max(parseInt(fileCount, 10) || 10, 5), 30);
+  const targetCount = Math.min(count, (files || []).length);
+  const lockKey = `readOrder:v2:${owner}:${repo}:${count}`;
 
   // In-flight deduplication: if a request for this key is already running, share its promise
   if (inFlightRequests.has(lockKey)) {
@@ -280,12 +284,13 @@ async function generateReadingList(repoName, files) {
     const client = getAIClient();
 
     if (!client) {
-      return getMockReadingList(files);
+      return getMockReadingList(files, count);
     }
 
     const systemInstruction =
       `You are a senior open-source maintainer helping a brand-new contributor understand the repository "${repoName}".\n` +
-      `Your task: given a pre-filtered list of source file paths, produce an ordered JSON reading list of the 6-10 most important files to read first.\n` +
+      `Your task: given a pre-filtered list of source file paths, produce an ordered JSON reading list of exactly ${targetCount} files to read first (prioritized by: Documentation > Entry Point > Core Logic > Config > Utilities).\n` +
+      `If the total number of pre-filtered source files is less than ${targetCount}, return all available files in a logical reading order.\n` +
       `\n` +
       `STRICT RULES — violating any rule makes your output useless:\n` +
       `\n` +
