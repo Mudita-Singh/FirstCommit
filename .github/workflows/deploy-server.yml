@@ -1,0 +1,63 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-server.yml'
+
+jobs:
+  deploy:
+    name: Trigger Deploy Hook & Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Server Deploy Hook
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set!"
+            exit 1
+          fi
+          echo "Triggering server deployment hook..."
+          curl -s -S -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      - name: Wait for Deployment Rollout
+        run: |
+          echo "Waiting 45 seconds for deployment to build and start on server host..."
+          sleep 45
+
+      - name: Post-Deploy Health Check Smoke Test
+        run: |
+          SERVER_URL="${{ secrets.SERVER_URL }}"
+          if [ -z "$SERVER_URL" ]; then
+            SERVER_URL="https://firstcommit-4y9h.onrender.com"
+          fi
+          
+          HEALTH_ENDPOINT="${SERVER_URL}/api/health"
+          echo "Running smoke test against endpoint: ${HEALTH_ENDPOINT}"
+          
+          MAX_RETRIES=10
+          RETRY_DELAY=15
+          SUCCESS=false
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES..."
+            HTTP_STATUS=$(curl -s -o /tmp/health_response.json -w "%{http_code}" "$HEALTH_ENDPOINT" || true)
+            
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "Health check succeeded! Response:"
+              cat /tmp/health_response.json
+              echo ""
+              SUCCESS=true
+              break
+            else
+              echo "Health check failed with HTTP status $HTTP_STATUS. Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          if [ "$SUCCESS" = false ]; then
+            echo "::error::Smoke test failed! Server did not return HTTP 200 OK at ${HEALTH_ENDPOINT} after $MAX_RETRIES retries."
+            exit 1
+          fi

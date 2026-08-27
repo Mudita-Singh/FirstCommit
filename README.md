@@ -124,3 +124,74 @@ npm run dev
 
 - **Client dashboard**: `http://localhost:5173`
 - **Backend API**: `http://localhost:5000`
+
+---
+
+## 🔄 CI/CD & Deployment Setup
+
+FirstCommit uses **GitHub Actions** for continuous integration and automated server deployments.
+
+### 🛠️ GitHub Actions Workflows
+
+1. **Continuous Integration (`.github/workflows/ci.yml`)**:
+   - Runs automatically on every `push` and `pull_request` targeting `main` or `dev`.
+   - Utilizes a matrix strategy to lint, test, and build both `client` and `server` workspaces under Node.js 20.
+   - Script steps use `--if-present` so builds succeed as tests and linters are incrementally added.
+
+2. **Server Continuous Deployment (`.github/workflows/deploy-server.yml`)**:
+   - Triggers on `push` to `main` for changes under `server/**`.
+   - Sends an HTTP POST trigger to your Render / Railway deploy hook URL.
+   - Executes an automated post-deploy smoke test against `/api/health` with retry backoff to verify operational status.
+
+3. **Client Deployment (Vercel)**:
+   - Client CD uses Vercel's native GitHub integration. Connected to `main`, Vercel automatically deploys preview builds on PRs and production releases on merge.
+
+---
+
+### 🔑 Required Secrets & Environment Configuration
+
+Configure the following secrets in **GitHub Repository Settings -> Secrets and variables -> Actions**:
+
+| Secret Name | Description | Environment |
+| :--- | :--- | :--- |
+| `RENDER_DEPLOY_HOOK_URL` | Deploy Hook URL generated in Render service settings (`Settings -> Deploy Hook`). | Production CI/CD |
+| `SERVER_URL` | Base URL of the backend API (e.g. `https://firstcommit-4y9h.onrender.com`). | Production CI/CD |
+
+#### Deployment Platform Environment Variables (Render / Railway / Vercel)
+> [!TIP]
+> Keep **Staging** and **Production** environments isolated by using separate MongoDB Atlas database clusters, distinct GitHub OAuth Applications, and separate Gemini API keys.
+
+- **Server Hosting (Render/Railway)**:
+  - `MONGODB_URI`: Production database connection string.
+  - `GEMINI_API_KEY`: API key for Google Gemini AI service.
+  - `GITHUB_CLIENT_ID` & `GITHUB_CLIENT_SECRET`: GitHub OAuth app credentials.
+  - `GITHUB_CALLBACK_URL`: `https://<server-domain>/api/auth/github/callback`
+  - `CLIENT_URL`: `https://firstcommit-ten.vercel.app`
+  - `JWT_SECRET`: Secret string for HTTP-only JWT cookies (`fc_token`).
+  - `NODE_ENV`: `production`
+
+---
+
+### 🌐 Cross-Origin Auth & Cookie Architecture
+
+FirstCommit uses HTTP-only JWT cookies (`fc_token`) with Passport GitHub OAuth for secure user authentication.
+
+> [!IMPORTANT]
+> **Cross-Domain Cookie Considerations**:
+> When the frontend (`https://firstcommit-ten.vercel.app`) and backend (`https://firstcommit-4y9h.onrender.com`) reside on different host domains, browsers enforce strict third-party cookie restrictions:
+>
+> 1. **Vercel API Rewrites (Recommended & Enabled)**:
+>    FirstCommit includes a `vercel.json` rewrite configuration:
+>    ```json
+>    {
+>      "rewrites": [
+>        { "source": "/api/:path*", "destination": "https://firstcommit-4y9h.onrender.com/api/:path*" }
+>      ]
+>    }
+>    ```
+>    This proxies all frontend API calls from `/api/*` to the Render backend, keeping requests **Same-Origin** from the browser's perspective and completely eliminating 3rd-party cookie blocking.
+>
+> 2. **Express Proxy Trust & Cookie Flags**:
+>    - In `server/src/server.js`, `app.set('trust proxy', 1)` is enabled in production so Express accurately detects HTTPS headers forwarded by Render's reverse proxy.
+>    - Cookies are configured with `secure: true`, `httpOnly: true`, and `sameSite: 'none'` (or `'lax'` when proxied through Vercel).
+
