@@ -90,6 +90,9 @@ function App() {
   const [error, setError] = useState(null);
 
   // Split-view states
+  const [isWorkspaceView, setIsWorkspaceView] = useState(() => {
+    return window.location.pathname.startsWith('/workspace') || window.location.search.includes('repo=');
+  });
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileCode, setFileCode] = useState('');
   const [fileExplanation, setFileExplanation] = useState('');
@@ -164,8 +167,10 @@ function App() {
     const handlePop = (e) => {
       if (e.state?.view === 'workspace') {
         setSelectedFile(null);
+        setIsWorkspaceView(true);
       } else {
         // User pressed Back — return to homepage
+        setIsWorkspaceView(false);
         setAnalysisData(null);
         setSelectedFile(null);
         setFileCode('');
@@ -181,6 +186,7 @@ function App() {
   const analyzeUrl = useCallback(async (targetUrl, demoName = null, requestedCount = null) => {
     if (!targetUrl.trim()) return;
 
+    setIsWorkspaceView(true);
     const countToUse = requestedCount || fileCount;
 
     if (demoName) {
@@ -189,7 +195,9 @@ function App() {
       setIsLoading(true);
     }
     setError(null);
-    setAnalysisData(null);
+    if (!requestedCount) {
+      setAnalysisData(null);
+    }
     setSelectedFile(null);
 
     let cleanUrl = targetUrl.trim();
@@ -213,7 +221,9 @@ function App() {
         const data = response.data;
         data.fullName = `${data.owner}/${data.repo}`;
         setAnalysisData(data);
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        if (!requestedCount) {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }
       } else {
         throw new Error(response.message || 'Failed to analyze repository');
       }
@@ -253,6 +263,7 @@ function App() {
 
   const handleGoHome = () => {
     window.history.pushState({}, '', '/');
+    setIsWorkspaceView(false);
     setRepoUrl('');
     setAnalysisData(null);
     setSelectedFile(null);
@@ -648,7 +659,7 @@ function App() {
   };
 
 
-  const isHome = !analysisData && !selectedFile;
+  const isHome = !isWorkspaceView && !selectedFile;
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -1209,36 +1220,78 @@ function App() {
               </div>
 
               {activeTab === 'readOrder' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: '#4B5563', fontWeight: '600' }}>Count:</label>
-                  <select
-                    value={fileCount}
-                    onChange={(e) => {
-                      const newCount = Number(e.target.value);
-                      setFileCount(newCount);
-                      if (analysisData) {
-                        analyzeUrl(`https://github.com/${analysisData.owner}/${analysisData.repo}`, null, newCount);
-                      }
-                    }}
-                    disabled={isLoading}
-                    style={{
-                      backgroundColor: 'white',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
-                      padding: '0.25rem 0.5rem',
-                      fontSize: '0.78rem',
-                      fontWeight: '600',
-                      color: '#111827',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={5}>5 files</option>
-                    <option value={10}>10 files</option>
-                    <option value={15}>15 files</option>
-                    <option value={20}>20 files</option>
-                    <option value={30}>30 files</option>
-                  </select>
-                  <span className="ws-count-badge">{analysisData.readingList.length} items</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '8px',
+                    padding: '0.3rem 0.75rem'
+                  }}>
+                    <label htmlFor="file-count-select" style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                      </svg>
+                      Limit:
+                    </label>
+                    <select
+                      id="file-count-select"
+                      value={fileCount}
+                      onChange={(e) => {
+                        const newCount = Number(e.target.value);
+                        setFileCount(newCount);
+                        if (analysisData) {
+                          analyzeUrl(`https://github.com/${analysisData.owner}/${analysisData.repo}`, null, newCount);
+                        }
+                      }}
+                      disabled={isLoading}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        padding: '0.25rem 0.6rem',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: '#0F172A',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      }}
+                    >
+                      <option value={5}>5 files</option>
+                      <option value={10}>10 files</option>
+                      <option value={15}>15 files</option>
+                      <option value={20}>20 files</option>
+                      <option value={30}>30 files</option>
+                    </select>
+                  </div>
+
+                  {/* Items badge with clear explanation */}
+                  {analysisData?.readingList && (
+                    <div 
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        backgroundColor: '#EFF6FF',
+                        color: '#1D4ED8',
+                        border: '1px solid #BFDBFE',
+                        fontSize: '0.78rem',
+                        fontWeight: '600',
+                        borderRadius: '9999px',
+                        padding: '0.3rem 0.75rem'
+                      }}
+                      title={`Showing ${analysisData.readingList.length} files generated in the reading path`}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                      </svg>
+                      <span>{analysisData.readingList.length} {analysisData.readingList.length === 1 ? 'file' : 'files'} in reading path</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
