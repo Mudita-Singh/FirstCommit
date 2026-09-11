@@ -90,9 +90,6 @@ function App() {
   const [error, setError] = useState(null);
 
   // Split-view states
-  const [isWorkspaceView, setIsWorkspaceView] = useState(() => {
-    return window.location.pathname.startsWith('/workspace') || window.location.search.includes('repo=');
-  });
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileCode, setFileCode] = useState('');
   const [fileExplanation, setFileExplanation] = useState('');
@@ -167,10 +164,8 @@ function App() {
     const handlePop = (e) => {
       if (e.state?.view === 'workspace') {
         setSelectedFile(null);
-        setIsWorkspaceView(true);
       } else {
         // User pressed Back — return to homepage
-        setIsWorkspaceView(false);
         setAnalysisData(null);
         setSelectedFile(null);
         setFileCode('');
@@ -186,7 +181,6 @@ function App() {
   const analyzeUrl = useCallback(async (targetUrl, demoName = null, requestedCount = null) => {
     if (!targetUrl.trim()) return;
 
-    setIsWorkspaceView(true);
     const countToUse = requestedCount || fileCount;
 
     if (demoName) {
@@ -273,7 +267,6 @@ function App() {
 
   const handleGoHome = () => {
     window.history.pushState({}, '', '/');
-    setIsWorkspaceView(false);
     setRepoUrl('');
     setAnalysisData(null);
     setSelectedFile(null);
@@ -669,7 +662,7 @@ function App() {
   };
 
 
-  const isHome = !isWorkspaceView && !selectedFile;
+  const isHome = !analysisData && !selectedFile;
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
