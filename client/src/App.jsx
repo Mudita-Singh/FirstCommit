@@ -195,10 +195,6 @@ function App() {
       setIsLoading(true);
     }
     setError(null);
-    if (!requestedCount) {
-      setAnalysisData(null);
-    }
-    setSelectedFile(null);
 
     let cleanUrl = targetUrl.trim();
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
@@ -208,6 +204,17 @@ function App() {
         cleanUrl = `https://github.com/${cleanUrl}`;
       }
     }
+
+    // Only clear analysisData if switching to a completely new repository
+    const isSameRepo = analysisDataRef.current && (
+      cleanUrl.toLowerCase().includes(`${analysisDataRef.current.owner}/${analysisDataRef.current.repo}`.toLowerCase()) ||
+      cleanUrl.toLowerCase().includes(analysisDataRef.current.repo.toLowerCase())
+    );
+
+    if (!isSameRepo && !requestedCount) {
+      setAnalysisData(null);
+    }
+    setSelectedFile(null);
 
     try {
       const response = await analyzeRepository(cleanUrl, countToUse);
@@ -221,7 +228,7 @@ function App() {
         const data = response.data;
         data.fullName = `${data.owner}/${data.repo}`;
         setAnalysisData(data);
-        if (!requestedCount) {
+        if (!requestedCount && !isSameRepo) {
           window.scrollTo({ top: 0, behavior: 'instant' });
         }
       } else {
@@ -235,11 +242,14 @@ function App() {
     }
   }, [fileCount]);
 
-  // Auto-analyze repo if specified in URL query param on mount (e.g. after OAuth redirect)
+  // Auto-analyze repo if specified in URL query param on mount (runs once)
+  const hasInitializedFromUrl = useRef(false);
   useEffect(() => {
+    if (hasInitializedFromUrl.current) return;
     const params = new URLSearchParams(window.location.search);
     const repoParam = params.get('repo') || params.get('url');
     if (repoParam) {
+      hasInitializedFromUrl.current = true;
       setRepoUrl(repoParam);
       analyzeUrl(repoParam);
     }
