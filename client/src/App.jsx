@@ -115,7 +115,8 @@ function App() {
 
   const handleSaveRepo = async () => {
     if (!user) {
-      window.location.href = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api/auth/github`;
+      const redirectPath = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api/auth/github?redirect=${redirectPath}`;
       return;
     }
     const result = await saveRepo({
@@ -193,14 +194,22 @@ function App() {
 
     let cleanUrl = targetUrl.trim();
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      cleanUrl = `https://github.com/${cleanUrl}`;
+      if (cleanUrl.includes('.github.io')) {
+        cleanUrl = `https://${cleanUrl}`;
+      } else {
+        cleanUrl = `https://github.com/${cleanUrl}`;
+      }
     }
 
     try {
       const response = await analyzeRepository(cleanUrl, countToUse);
       if (response?.status === 'success') {
-        // Push a new history entry so Back button works
-        window.history.pushState({ view: 'workspace', url: cleanUrl }, '', '/workspace');
+        // Push a new history entry with repo query param so URL persistence works
+        window.history.pushState(
+          { view: 'workspace', url: cleanUrl },
+          '',
+          `/workspace?repo=${encodeURIComponent(cleanUrl)}`
+        );
         const data = response.data;
         data.fullName = `${data.owner}/${data.repo}`;
         setAnalysisData(data);
@@ -215,6 +224,16 @@ function App() {
       setLoadingDemo(null);
     }
   }, [fileCount]);
+
+  // Auto-analyze repo if specified in URL query param on mount (e.g. after OAuth redirect)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const repoParam = params.get('repo') || params.get('url');
+    if (repoParam) {
+      setRepoUrl(repoParam);
+      analyzeUrl(repoParam);
+    }
+  }, [analyzeUrl]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

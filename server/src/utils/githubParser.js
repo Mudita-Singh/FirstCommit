@@ -26,7 +26,17 @@ function parseGithubUrl(url) {
       return { owner, repo };
     }
 
-    // 2. Fallback for shorthand "owner/repo" input (e.g., "expressjs/express")
+    // 2. GitHub Pages URL (e.g., https://owner.github.io/repo/ or owner.github.io)
+    const pagesRegex = /(?:https?:\/\/)?([a-zA-Z0-9_\-\.]+)\.github\.io(?:\/([^\/\?\s#]+))?/i;
+    const pagesMatch = trimmed.match(pagesRegex);
+    if (pagesMatch && pagesMatch[1]) {
+      const owner = pagesMatch[1];
+      const repoPath = pagesMatch[2] ? pagesMatch[2].replace(/\.git$/i, '') : '';
+      const repo = repoPath || `${owner}.github.io`;
+      return { owner, repo };
+    }
+
+    // 3. Fallback for shorthand "owner/repo" input (e.g., "expressjs/express")
     const shorthandRegex = /^([a-zA-Z0-9_\-\.]+)\/([a-zA-Z0-9_\-\.]+?)(?:\.git)?$/;
     const shortMatch = trimmed.match(shorthandRegex);
     if (shortMatch && shortMatch[1] && shortMatch[2]) {

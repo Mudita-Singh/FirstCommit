@@ -64,11 +64,20 @@ passport.deserializeUser(async (id, done) => {
 
 // GET /api/auth/github
 // Initiates GitHub OAuth flow
-router.get('/github', 
+router.get('/github', (req, res, next) => {
+  const { redirect } = req.query;
+  if (redirect) {
+    res.cookie('auth_redirect', redirect, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 10 * 60 * 1000 // 10 minutes
+    });
+  }
   passport.authenticate('github', { 
     scope: ['user:email'] 
-  })
-)
+  })(req, res, next);
+})
 
 // GET /api/auth/github/callback
 // GitHub redirects here after authorization
@@ -93,7 +102,17 @@ router.get('/github/callback',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       })
 
-      const redirectUrl = CLIENT_URL
+      const savedRedirect = req.cookies?.auth_redirect;
+      res.clearCookie('auth_redirect', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+      });
+
+      let redirectUrl = CLIENT_URL;
+      if (savedRedirect && typeof savedRedirect === 'string' && savedRedirect.startsWith('/')) {
+        redirectUrl = `${CLIENT_URL}${savedRedirect}`;
+      }
       
       res.redirect(redirectUrl)
     } catch (error) {
