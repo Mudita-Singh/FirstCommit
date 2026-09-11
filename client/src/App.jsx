@@ -1067,7 +1067,7 @@ function App() {
                     boxShadow: '0 1px 2px 0 rgba(0,0,0,0.02)'
                   }}>
                     {/* Stars */}
-                    {analysisData?.stars && (
+                    {analysisData?.stars != null && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <div style={{
                           display: 'flex',
@@ -1094,12 +1094,12 @@ function App() {
                     )}
 
                     {/* Divider */}
-                    {analysisData?.stars && analysisData?.filesCount && (
+                    {analysisData?.stars != null && analysisData?.filesCount != null && (
                       <div style={{ width: '1px', height: '24px', backgroundColor: '#E5E7EB' }}></div>
                     )}
 
                     {/* Files */}
-                    {analysisData?.filesCount && (
+                    {analysisData?.filesCount != null && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <div style={{
                           display: 'flex',
