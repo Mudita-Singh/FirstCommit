@@ -689,30 +689,6 @@ function App() {
                   onChange={e => setRepoUrl(e.target.value)}
                   disabled={isLoading || loadingDemo !== null}
                 />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginRight: '0.4rem', flexShrink: 0 }}>
-                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>Files:</span>
-                  <select
-                    value={fileCount}
-                    onChange={e => setFileCount(Number(e.target.value))}
-                    disabled={isLoading || loadingDemo !== null}
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '6px',
-                      padding: '0.35rem 0.6rem',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      color: '#334155',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={5}>5 files</option>
-                    <option value={10}>10 files</option>
-                    <option value={15}>15 files</option>
-                    <option value={20}>20 files</option>
-                    <option value={30}>30 files</option>
-                  </select>
-                </div>
                 <button
                   type="submit"
                   className="search-btn"
