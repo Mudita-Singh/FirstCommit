@@ -1,8 +1,29 @@
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api`;
 
+function formatErrorMessage(status, rawText) {
+  if (status === 502) {
+    return 'Server Error (502 Bad Gateway): The backend server is currently starting up or unavailable. Please try again in a few seconds.';
+  }
+  if (status === 504) {
+    return 'Server Error (504 Gateway Timeout): The request took too long to complete. Please try again.';
+  }
+  if (rawText) {
+    const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      return `Server Error (${status}): ${titleMatch[1].trim()}`;
+    }
+    const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanText) {
+      return `Server Error (${status}): ${cleanText.slice(0, 150)}`;
+    }
+  }
+  return `Server error status: ${status}`;
+}
+
 async function parseJsonResponse(res) {
   const contentType = res.headers.get('content-type') || '';
   let data = null;
+  let rawText = '';
 
   if (contentType.includes('application/json')) {
     try {
@@ -11,12 +32,15 @@ async function parseJsonResponse(res) {
       data = null;
     }
   } else {
-    const text = await res.text();
-    data = { message: text.slice(0, 200) || `Server error status: ${res.status}` };
+    rawText = await res.text();
   }
 
   if (!res.ok) {
-    const err = new Error(data?.message || data?.error || `Server error status: ${res.status}`);
+    let errorMsg = data?.message || data?.error;
+    if (!errorMsg) {
+      errorMsg = formatErrorMessage(res.status, rawText);
+    }
+    const err = new Error(errorMsg);
     err.status = res.status;
     throw err;
   }
