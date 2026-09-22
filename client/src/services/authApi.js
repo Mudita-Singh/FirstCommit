@@ -1,12 +1,38 @@
 const API_BASE = import.meta.env.VITE_API_URL 
   || (import.meta.env.DEV ? 'http://localhost:5000' : '')
 
+async function parseJsonResponse(res) {
+  const contentType = res.headers.get('content-type') || '';
+  let data = null;
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = null;
+    }
+  } else {
+    const text = await res.text();
+    data = { message: text.slice(0, 200) || `Server error status: ${res.status}` };
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.message || data?.error || `Request failed with status ${res.status}`);
+  }
+
+  return data;
+}
+
 export const getMe = async () => {
-  const res = await fetch(`${API_BASE}/api/auth/me`, {
-    credentials: 'include' // ← sends cookies
-  })
-  if (!res.ok) return null
-  return res.json()
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, {
+      credentials: 'include' // ← sends cookies
+    })
+    if (!res.ok) return null
+    return await parseJsonResponse(res)
+  } catch (e) {
+    return null
+  }
 }
 
 export const logout = async () => {
@@ -23,7 +49,7 @@ export const saveRepo = async (repoData) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(repoData)
   })
-  return res.json()
+  return await parseJsonResponse(res)
 }
 
 export const unsaveRepo = async (owner, repo) => {
@@ -34,5 +60,6 @@ export const unsaveRepo = async (owner, repo) => {
       credentials: 'include'
     }
   )
-  return res.json()
+  return await parseJsonResponse(res)
 }
+

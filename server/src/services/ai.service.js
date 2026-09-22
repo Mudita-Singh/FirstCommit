@@ -369,7 +369,8 @@ async function generateReadingList(repoName, files, fileCount = 10) {
       const result = await callWithRetry(() => model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          responseMimeType: 'application/json' // Force structured JSON output
+          responseMimeType: 'application/json', // Force structured JSON output
+          maxOutputTokens: 8192
         }
       }));
 
@@ -393,7 +394,7 @@ async function generateReadingList(repoName, files, fileCount = 10) {
       return parsedData;
     } catch (error) {
       console.error('Error generating AI reading list:', error);
-      return getMockReadingList(files);
+      return getMockReadingList(files, count);
     }
   })();
 

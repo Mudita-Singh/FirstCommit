@@ -1,5 +1,29 @@
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api`;
 
+async function parseJsonResponse(res) {
+  const contentType = res.headers.get('content-type') || '';
+  let data = null;
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = null;
+    }
+  } else {
+    const text = await res.text();
+    data = { message: text.slice(0, 200) || `Server error status: ${res.status}` };
+  }
+
+  if (!res.ok) {
+    const err = new Error(data?.message || data?.error || `Server error status: ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+
+  return data;
+}
+
 /**
  * Fetch issues for a repository
  * @param {string} owner - Repository owner
@@ -9,13 +33,7 @@ const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '
 export const fetchIssues = async (owner, repo) => {
   try {
     const response = await fetch(`${API_BASE_URL}/issues/${owner}/${repo}`);
-    const result = await response.json();
-    if (!response.ok) {
-      const err = new Error(result.message || `Server error status: ${response.status}`);
-      err.status = response.status;
-      throw err;
-    }
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('fetchIssues failed:', error);
     throw error;
@@ -48,15 +66,10 @@ export const analyzeIssue = async (owner, repo, issueNumber, issueTitle, issueBo
         fileTree
       }),
     });
-    const result = await response.json();
-    if (!response.ok) {
-      const err = new Error(result.message || `Server error status: ${response.status}`);
-      err.status = response.status;
-      throw err;
-    }
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('analyzeIssue failed:', error);
     throw error;
   }
 };
+
