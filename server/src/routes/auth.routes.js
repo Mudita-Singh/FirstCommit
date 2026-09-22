@@ -74,8 +74,11 @@ router.get('/github', (req, res, next) => {
       maxAge: 10 * 60 * 1000 // 10 minutes
     });
   }
+
+  const statePayload = redirect ? JSON.stringify({ redirect }) : undefined;
   passport.authenticate('github', { 
-    scope: ['user:email'] 
+    scope: ['user:email'],
+    ...(statePayload ? { state: statePayload } : {})
   })(req, res, next);
 })
 
@@ -102,7 +105,16 @@ router.get('/github/callback',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       })
 
-      const savedRedirect = req.cookies?.auth_redirect;
+      let savedRedirect = req.cookies?.auth_redirect;
+      if (!savedRedirect && req.query.state) {
+        try {
+          const parsedState = JSON.parse(req.query.state);
+          savedRedirect = parsedState.redirect;
+        } catch (e) {
+          console.warn('Could not parse OAuth state:', e.message);
+        }
+      }
+
       res.clearCookie('auth_redirect', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

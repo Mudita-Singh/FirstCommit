@@ -238,7 +238,8 @@ export default function FloatingChat({
       const context = {
         owner, repo, description,
         techStack, fileTree,
-        currentTab, selectedIssue, selectedFile
+        currentTab, selectedIssue, selectedFile,
+        issues
       }
       
       const response = await sendChatMessage(

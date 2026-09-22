@@ -1,5 +1,57 @@
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api`;
 
+function formatErrorMessage(status, rawText) {
+  if (status === 502) {
+    return 'Server Error (502 Bad Gateway): The backend server is currently starting up or unavailable. Please try again in a few seconds.';
+  }
+  if (status === 504) {
+    return 'Server Error (504 Gateway Timeout): The repository analysis request took too long to complete. Please try again.';
+  }
+  if (rawText) {
+    const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      return `Server Error (${status}): ${titleMatch[1].trim()}`;
+    }
+    const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanText) {
+      return `Server Error (${status}): ${cleanText.slice(0, 150)}`;
+    }
+  }
+  return `Server error status: ${status}`;
+}
+
+/**
+ * Safely parses response body as JSON if possible, handling non-JSON text/HTML errors gracefully.
+ */
+async function parseJsonResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  let data = null;
+  let rawText = '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = null;
+    }
+  } else {
+    rawText = await response.text();
+  }
+
+  if (!response.ok) {
+    let errorMsg = data?.message || data?.error;
+    if (!errorMsg) {
+      errorMsg = formatErrorMessage(response.status, rawText);
+    }
+    const err = new Error(errorMsg);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  return data;
+}
+
 /**
  * Fetch the health status of the Express server API.
  * @returns {Promise<object>} JSON response from the health endpoint.
@@ -7,10 +59,7 @@ const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '
 export const fetchHealth = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/health`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('API health check failed:', error);
     throw error;
@@ -33,15 +82,7 @@ export const analyzeRepository = async (url, fileCount = 10) => {
       body: JSON.stringify({ url, fileCount }),
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      const err = new Error(result.message || `Server returned error status: ${response.status}`);
-      err.status = response.status;
-      throw err;
-    }
-
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('Repository analysis failed:', error);
     throw error;
@@ -64,13 +105,7 @@ export const fetchFileExplanation = async (path, code) => {
       body: JSON.stringify({ path, code }),
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || `Server returned error status: ${response.status}`);
-    }
-
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('Failed to fetch file explanation:', error);
     throw error;
@@ -95,13 +130,7 @@ export const explainFileWithBlocks = async (repoOwner, repoName, filePath, simpl
       body: JSON.stringify({ repoOwner, repoName, filePath, simplify }),
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || `Server returned error status: ${response.status}`);
-    }
-
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('Failed to fetch file block explanation:', error);
     throw error;
@@ -121,13 +150,7 @@ export const fetchRawFileContent = async (repoOwner, repoName, filePath) => {
       body: JSON.stringify({ repoOwner, repoName, filePath }),
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || `Server returned error status: ${response.status}`);
-    }
-
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('Failed to fetch raw file content:', error);
     throw error;
@@ -147,15 +170,7 @@ export const explainFileWithBlocksOnly = async (filePath, rawContent, simplify =
       body: JSON.stringify({ filePath, rawContent, simplify }),
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      const err = new Error(result.message || `Server returned error status: ${response.status}`);
-      err.status = response.status;
-      throw err;
-    }
-
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('Failed to explain file blocks:', error);
     throw error;
@@ -174,11 +189,8 @@ export const fetchFileUsages = async (repoOwner, repoName, filePath) => {
       },
       body: JSON.stringify({ repoOwner, repoName, filePath }),
     });
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.message || `Server returned error status: ${response.status}`);
-    }
-    return result;
+
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('Failed to fetch file usages:', error);
     throw error;

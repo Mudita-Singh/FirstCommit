@@ -63,13 +63,19 @@ Current context:`
     prompt += `\nUser has file open: ${selectedFile}`
   }
 
-  if (context.issues && Array.isArray(context.issues) && context.issues.length > 0) {
-    prompt += `\n\nActive open issues in repository ${owner}/${repo} (${context.issues.length} total fetched):\n` +
-      context.issues.slice(0, 30).map(i => {
-        const labels = Array.isArray(i.labels) ? i.labels.join(', ') : '';
-        const bodySnippet = i.body ? i.body.slice(0, 150).replace(/\s+/g, ' ') : '';
-        return `- Issue #${i.number}: "${i.title}" [Difficulty: ${i.difficulty || 'Unknown'}${labels ? `, Labels: ${labels}` : ''}] ${bodySnippet ? `\n  Description snippet: ${bodySnippet}` : ''}`;
-      }).join('\n');
+  if (context.issues && Array.isArray(context.issues)) {
+    if (context.issues.length > 0) {
+      prompt += `\n\nActive open GitHub issues in repository ${owner}/${repo} (${context.issues.length} total fetched):\n` +
+        context.issues.slice(0, 30).map(i => {
+          const labels = Array.isArray(i.labels) ? i.labels.join(', ') : '';
+          const bodySnippet = i.body ? i.body.slice(0, 150).replace(/\s+/g, ' ') : '';
+          return `- Issue #${i.number}: "${i.title}" [Difficulty: ${i.difficulty || 'Unknown'}${labels ? `, Labels: ${labels}` : ''}] ${bodySnippet ? `\n  Description snippet: ${bodySnippet}` : ''}`;
+        }).join('\n');
+    } else {
+      prompt += `\n\nActive open GitHub issues in repository ${owner}/${repo}: Currently 0 open GitHub issues found.`;
+    }
+  } else {
+    prompt += `\n\nActive open GitHub issues in repository ${owner}/${repo}: Issue status unavailable.`;
   }
 
   prompt += `
@@ -77,14 +83,15 @@ Current context:`
 Your role:
 - Help beginners understand this specific codebase
 - Give concrete, specific answers about THIS repo
+- You DO have access to the repository's open GitHub issues listed above! When asked if this repository has any open issues (e.g. "does this repo have any issue?", "what issues are open?"), report or list the open GitHub issues provided above.
+- If the open GitHub issues list shows 0 open issues, explicitly state that there are currently 0 open GitHub issues in this repository.
+- Do NOT confuse open GitHub issues with internal code architecture trade-offs or replication comments in source code files unless the user specifically asks about code design flaws.
 - When mentioning files, use their actual paths
 - Explain technical concepts in simple terms
 - If asked how to run the project, check for 
   package.json scripts or README hints in the file tree
 - Be encouraging — users are new to open source
 - Keep answers concise but helpful
-- If you don't know something specific, say so 
-  honestly rather than guessing
 
 ${isIndexed ?
       'You have access to the actual code content via RAG search.' :
@@ -105,9 +112,12 @@ async function generateChatResponse(
       process.env.GEMINI_API_KEY
     )
 
-    // If repo is indexed, search for relevant chunks
+    // Detect if user query is asking about GitHub issues/open tasks
+    const isIssueQuery = /\b(open\s+)?issues?\b/i.test(message) || /\b(good\s+first\s+)?issues?\b/i.test(message) || /\btasks?\b/i.test(message);
+
+    // If repo is indexed, search for relevant code chunks (skip for repository-level issue metadata queries)
     let ragContext = ''
-    if (context.isIndexed && message.length > 10) {
+    if (context.isIndexed && message.length > 10 && !isIssueQuery) {
       console.log('Searching Pinecone for:',
         message.slice(0, 50))
 

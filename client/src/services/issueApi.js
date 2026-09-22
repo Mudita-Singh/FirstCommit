@@ -1,5 +1,53 @@
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api`;
 
+function formatErrorMessage(status, rawText) {
+  if (status === 502) {
+    return 'Server Error (502 Bad Gateway): The backend server is currently starting up or unavailable. Please try again in a few seconds.';
+  }
+  if (status === 504) {
+    return 'Server Error (504 Gateway Timeout): The request took too long to complete. Please try again.';
+  }
+  if (rawText) {
+    const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      return `Server Error (${status}): ${titleMatch[1].trim()}`;
+    }
+    const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanText) {
+      return `Server Error (${status}): ${cleanText.slice(0, 150)}`;
+    }
+  }
+  return `Server error status: ${status}`;
+}
+
+async function parseJsonResponse(res) {
+  const contentType = res.headers.get('content-type') || '';
+  let data = null;
+  let rawText = '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = null;
+    }
+  } else {
+    rawText = await res.text();
+  }
+
+  if (!res.ok) {
+    let errorMsg = data?.message || data?.error;
+    if (!errorMsg) {
+      errorMsg = formatErrorMessage(res.status, rawText);
+    }
+    const err = new Error(errorMsg);
+    err.status = res.status;
+    throw err;
+  }
+
+  return data;
+}
+
 /**
  * Fetch issues for a repository
  * @param {string} owner - Repository owner
@@ -9,13 +57,7 @@ const API_BASE_URL = `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '
 export const fetchIssues = async (owner, repo) => {
   try {
     const response = await fetch(`${API_BASE_URL}/issues/${owner}/${repo}`);
-    const result = await response.json();
-    if (!response.ok) {
-      const err = new Error(result.message || `Server error status: ${response.status}`);
-      err.status = response.status;
-      throw err;
-    }
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('fetchIssues failed:', error);
     throw error;
@@ -48,15 +90,10 @@ export const analyzeIssue = async (owner, repo, issueNumber, issueTitle, issueBo
         fileTree
       }),
     });
-    const result = await response.json();
-    if (!response.ok) {
-      const err = new Error(result.message || `Server error status: ${response.status}`);
-      err.status = response.status;
-      throw err;
-    }
-    return result;
+    return await parseJsonResponse(response);
   } catch (error) {
     console.error('analyzeIssue failed:', error);
     throw error;
   }
 };
+

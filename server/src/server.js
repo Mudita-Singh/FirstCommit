@@ -75,10 +75,20 @@ app.use('/api/issues', issueRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
 
+// Global error handling middleware — ensures all unhandled server errors return JSON
+app.use((err, req, res, next) => {
+  console.error('Unhandled Server Error:', err);
+  res.status(err.status || 500).json({
+    status: 'error',
+    message: err.message || 'An unexpected error occurred on the server.'
+  });
+});
+
 // Start listening for incoming network requests
 app.listen(PORT, () => {
   const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
   console.log(`Server is running in ${mode} mode on http://localhost:${PORT}`);
 });
+
 
 // Auto-trigger reload 3
