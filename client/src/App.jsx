@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchHealth, analyzeRepository, fetchFileExplanation, fetchRawFileContent } from './services/api';
+import { fetchIssues } from './services/issueApi';
 import { getMe, logout, saveRepo, unsaveRepo } from './services/authApi';
 import CodeViewer from './CodeViewer';
 import Navbar from './Navbar';
@@ -96,6 +97,7 @@ function App() {
   const [isViewerLoading, setIsViewerLoading] = useState(false);
   const [techStack, setTechStack] = useState([]);
   const [repoDescription, setRepoDescription] = useState('');
+  const [repoIssues, setRepoIssues] = useState([]);
   const [activeTab, setActiveTab] = useState('readOrder');
   const selectedIssue = null;
 
@@ -302,6 +304,25 @@ function App() {
       }
     };
     fetchDescription();
+  }, [analysisData]);
+
+  // Asynchronously load issues for Chat context
+  useEffect(() => {
+    if (!analysisData) {
+      setRepoIssues([]);
+      return;
+    }
+    const loadRepoIssues = async () => {
+      try {
+        const res = await fetchIssues(analysisData.owner, analysisData.repo);
+        if (res?.issues) {
+          setRepoIssues(res.issues);
+        }
+      } catch (err) {
+        console.warn('Could not load issues for chat context:', err.message);
+      }
+    };
+    loadRepoIssues();
   }, [analysisData]);
 
   // Asynchronously load and parse package.json for tech stack tags
@@ -673,7 +694,7 @@ function App() {
       {/* ── HOMEPAGE ─────────────────────────────────────────────────────── */}
       {isHome && (
         <>
-          <Navbar isHome={true} user={user} authLoading={authLoading} onLogout={handleLogout} />
+          <Navbar isHome={true} user={user} authLoading={authLoading} onLogout={handleLogout} analysisData={analysisData} />
 
           <main className="home-main">
 
@@ -994,7 +1015,7 @@ function App() {
       {/* ── WORKSPACE ────────────────────────────────────────────────────── */}
       {!isHome && (
         <div className="workspace-wrap">
-          <Navbar isHome={false} onLogoClick={handleGoHome} user={user} authLoading={authLoading} onLogout={handleLogout} hasActiveFile={!!selectedFile} />
+          <Navbar isHome={false} onLogoClick={handleGoHome} user={user} authLoading={authLoading} onLogout={handleLogout} hasActiveFile={!!selectedFile} analysisData={analysisData} />
           <Breadcrumb
             repoName={analysisData ? analysisData.fullName : null}
             filePath={selectedFile ? selectedFile.path : null}
@@ -1393,6 +1414,7 @@ function App() {
               currentTab={activeTab}
               selectedIssue={selectedIssue}
               selectedFile={selectedFile}
+              issues={repoIssues}
             />
           )}
           {selectedFile && (
