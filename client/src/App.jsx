@@ -683,7 +683,13 @@ function App() {
   };
 
 
-  const isHome = !analysisData && !selectedFile;
+  const hasRepoInUrl = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).has('repo') ||
+    new URLSearchParams(window.location.search).has('url') ||
+    window.location.pathname.startsWith('/workspace')
+  );
+
+  const isHome = !analysisData && !selectedFile && !hasRepoInUrl && !isLoading;
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
